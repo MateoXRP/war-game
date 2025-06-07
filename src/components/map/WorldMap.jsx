@@ -2,23 +2,21 @@
 import { useGame } from "../../context/GameContext"
 
 function WorldMap() {
-  const { territories: state, setTerritories, currentPlayer } = useGame()
+  const { territories: state, setTerritories, currentPlayer, nextTurn, isPlacementPhase } = useGame()
 
   const handleClick = (id) => {
-    setTerritories((prev) => {
-      const updated = [...prev]
-      const index = updated.findIndex((t) => t.id === id)
-      if (index >= 0) {
-        updated[index] = {
-          ...updated[index],
-          owner: currentPlayer.id,
-          troops: (updated[index].troops || 0) + 1,
-        }
-      } else {
-        updated.push({ id, owner: currentPlayer.id, troops: 1 })
-      }
-      return updated
-    })
+    if (!isPlacementPhase) return
+
+    const target = state.find((t) => t.id === id)
+    if (!target || target.owner) return
+
+    setTerritories((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, owner: currentPlayer.id, troops: 1 } : t
+      )
+    )
+
+    nextTurn()
   }
 
   const getOwnerColor = (ownerId) => {
@@ -32,7 +30,7 @@ function WorldMap() {
 
   const positions = {}
   const gridSpacing = 120
-  const globalOffset = { x: 80, y: 75 } // keep this original
+  const globalOffset = { x: 80, y: 75 }
 
   const continentOffsets = {
     "North America": { x: 0, y: 0 },
@@ -52,7 +50,7 @@ function WorldMap() {
         x:
           (offset.x + localCol) * gridSpacing +
           globalOffset.x +
-          localCol * 10 - 10, // ✅ slightly reduced left shift
+          localCol * 10 - 10,
         y: (offset.y + localRow) * gridSpacing + globalOffset.y,
       }
     })
@@ -75,7 +73,6 @@ function WorldMap() {
       height="750"
       className="rounded-xl bg-blue-800 mx-auto mb-2"
     >
-      {/* 🌐 Exterior-only connection lines */}
       {centerLines.map(([from, to], index) => {
         const a = positions[from]
         const b = positions[to]
@@ -108,7 +105,6 @@ function WorldMap() {
         )
       })}
 
-      {/* 🧱 Territories */}
       {state.map((t) => {
         const pos = positions[t.id]
         if (!pos) return null
@@ -140,7 +136,6 @@ function WorldMap() {
         )
       })}
 
-      {/* 🏷️ Continent labels */}
       {Object.entries(continentOffsets).map(([name, offset]) => {
         const labelX = (offset.x + 1.5) * gridSpacing + globalOffset.x
         const labelY = offset.y * gridSpacing + globalOffset.y - 20
