@@ -1,26 +1,46 @@
 // src/context/GameContext.jsx
 import { createContext, useContext, useState, useEffect } from "react"
-import { initialTerritories, players } from "../data/gameData"
+import { initialTerritories, players as basePlayers } from "../data/gameData"
 import { handleCpuTurn } from "../logic/cpuLogic"
 
 const GameContext = createContext()
 
+function rollDie() {
+  return Math.floor(Math.random() * 6) + 1
+}
+
 export function GameProvider({ children }) {
   const [territories, setTerritories] = useState(initialTerritories)
   const [turnIndex, setTurnIndex] = useState(0)
+  const [playerOrder, setPlayerOrder] = useState(null)
   const [isPlacementPhase, setIsPlacementPhase] = useState(true)
   const [isReinforcementPhase, setIsReinforcementPhase] = useState(false)
-  const [reinforcements, setReinforcements] = useState(() =>
-    players.reduce((acc, p) => ({ ...acc, [p.id]: 35 }), {})
-  )
+  const [reinforcements, setReinforcements] = useState({})
 
-  const currentPlayer = players[turnIndex % players.length]
+  const currentPlayer = playerOrder ? playerOrder[turnIndex % playerOrder.length] : null
 
   const nextTurn = () => {
     setTurnIndex((prev) => prev + 1)
   }
 
-  // Handle transition from placement to reinforcement phase
+  // Determine player order via die rolls
+  useEffect(() => {
+    if (!playerOrder) {
+      const rolls = basePlayers.map(p => ({ ...p, roll: rollDie() }))
+      rolls.sort((a, b) => b.roll - a.roll)
+
+      const ordered = [rolls[0], rolls[1], rolls[2]]
+      setPlayerOrder(ordered)
+
+      const initialReinforcements = {}
+      ordered.forEach((p) => {
+        initialReinforcements[p.id] = 35
+      })
+      setReinforcements(initialReinforcements)
+    }
+  }, [playerOrder])
+
+  // Transition to reinforcement phase
   useEffect(() => {
     const claimed = territories.filter((t) => t.owner).length
 
@@ -28,17 +48,16 @@ export function GameProvider({ children }) {
       setIsPlacementPhase(false)
       setIsReinforcementPhase(true)
 
-      // Subtract claimed territories from reinforcements
       const counts = {}
-      players.forEach((p) => {
+      playerOrder.forEach((p) => {
         const owned = territories.filter((t) => t.owner === p.id).length
         counts[p.id] = 35 - owned
       })
       setReinforcements(counts)
     }
-  }, [territories, isPlacementPhase])
+  }, [territories, isPlacementPhase, playerOrder])
 
-  // Handle end of reinforcement phase
+  // End reinforcement phase
   useEffect(() => {
     if (
       isReinforcementPhase &&
@@ -48,14 +67,16 @@ export function GameProvider({ children }) {
     }
   }, [reinforcements, isReinforcementPhase])
 
-  // Trigger CPU move automatically
+  // Trigger CPU turn
   useEffect(() => {
-    const player = currentPlayer
-    if (player.isCPU && (isPlacementPhase || isReinforcementPhase)) {
+    if (
+      currentPlayer?.isCPU &&
+      (isPlacementPhase || isReinforcementPhase)
+    ) {
       handleCpuTurn({
         territories,
         setTerritories,
-        currentPlayer: player,
+        currentPlayer,
         nextTurn,
         isPlacementPhase,
         isReinforcementPhase,
@@ -70,7 +91,7 @@ export function GameProvider({ children }) {
       value={{
         territories,
         setTerritories,
-        players,
+        players: playerOrder || [],
         currentPlayer,
         nextTurn,
         isPlacementPhase,
