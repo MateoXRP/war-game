@@ -1,11 +1,8 @@
-// src/logic/cpuLogic.js
-
 const cpuMemory = {
   cpu1: { continent: null, reinforceIndex: 0 },
   cpu2: { continent: null, reinforceIndex: 0 },
 }
 
-// Manually specified entry points per your layout
 const entryPointsByContinent = {
   "North America": ["na6", "na8"],        // NYC, Costa Rica
   "Europe": ["eu4", "eu8", "eu6"],        // GBR, France, Ukraine
@@ -39,7 +36,6 @@ export function handleCpuTurn({
       const continentMap = groupByContinent(territories)
       const memory = cpuMemory[currentPlayer.id]
 
-      // Assign preferred continent if not already
       if (!memory.continent) {
         const emptyContinent = Object.entries(continentMap).find(
           ([, group]) => group.every((t) => !t.owner)
@@ -58,7 +54,6 @@ export function handleCpuTurn({
         }
       }
 
-      // Try blocking other players
       const contested = unclaimed.filter((t) => {
         const owners = new Set(
           territories
@@ -75,33 +70,54 @@ export function handleCpuTurn({
     // --- Reinforcement Phase ---
     function handleReinforcementPhase() {
       const memory = cpuMemory[currentPlayer.id]
-      const continent = memory.continent
+      const preferredContinent = memory.continent
       const owned = territories.filter((t) => t.owner === currentPlayer.id)
 
-      const inContinent = owned.filter((t) => t.continent === continent)
+      const inContinent = owned.filter((t) => t.continent === preferredContinent)
       const fullControl =
         inContinent.length === 9 &&
         territories
-          .filter((t) => t.continent === continent)
+          .filter((t) => t.continent === preferredContinent)
           .every((t) => t.owner === currentPlayer.id)
 
       let targets = []
 
       if (fullControl) {
-        const entryIds = entryPointsByContinent[continent] || []
+        const entryIds = entryPointsByContinent[preferredContinent] || []
         targets = inContinent.filter((t) => entryIds.includes(t.id))
       } else {
         const frontline = inContinent.filter((t) =>
           isAdjacentToEnemy(t, territories, currentPlayer.id)
         )
-        if (frontline.length > 0) targets = frontline
+
+        const internalEntryPoints = inContinent.filter((t) =>
+          (entryPointsByContinent[preferredContinent] || []).includes(t.id)
+        )
+
+        const externalEntryPoints = owned.filter((t) =>
+          Object.entries(entryPointsByContinent).some(([continent, ids]) => {
+            if (continent === preferredContinent) return false
+            return ids.includes(t.id) &&
+              t.continent === continent &&
+              connectsTo(t.id, preferredContinent)
+          })
+        )
+
+        const merged = [...frontline, ...internalEntryPoints, ...externalEntryPoints]
+
+        // De-duplicate targets
+        const seen = new Set()
+        targets = merged.filter((t) => {
+          if (seen.has(t.id)) return false
+          seen.add(t.id)
+          return true
+        })
       }
 
       if (targets.length === 0) {
         targets = owned
       }
 
-      // Rotate through targets one per turn
       const index = memory.reinforceIndex % targets.length
       const target = targets[index]
       memory.reinforceIndex++
@@ -166,6 +182,17 @@ export function handleCpuTurn({
         }
       }
       return false
+    }
+
+    function connectsTo(territoryId, targetContinent) {
+      return Object.entries(entryPointsByContinent).some(([sourceContinent, ids]) => {
+        return ids.includes(territoryId) &&
+          sourceContinent !== targetContinent &&
+          entryPointsByContinent[targetContinent]?.some(id => {
+            const target = territories.find(t => t.id === id)
+            return target?.continent === targetContinent
+          })
+      })
     }
   }, 500)
 }
