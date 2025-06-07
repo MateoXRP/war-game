@@ -2,21 +2,48 @@
 import { useGame } from "../../context/GameContext"
 
 function WorldMap() {
-  const { territories: state, setTerritories, currentPlayer, nextTurn, isPlacementPhase } = useGame()
+  const {
+    territories: state,
+    setTerritories,
+    currentPlayer,
+    nextTurn,
+    isPlacementPhase,
+    isReinforcementPhase,
+    reinforcements,
+    setReinforcements,
+  } = useGame()
 
   const handleClick = (id) => {
-    if (!isPlacementPhase) return
-
     const target = state.find((t) => t.id === id)
-    if (!target || target.owner) return
+    if (!target) return
 
-    setTerritories((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, owner: currentPlayer.id, troops: 1 } : t
+    // Phase 1: Claiming
+    if (isPlacementPhase) {
+      if (target.owner) return
+      setTerritories((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, owner: currentPlayer.id, troops: 1 } : t
+        )
       )
-    )
+      nextTurn()
+    }
 
-    nextTurn()
+    // Phase 2: Reinforcements
+    else if (isReinforcementPhase) {
+      if (target.owner !== currentPlayer.id) return
+      if (reinforcements[currentPlayer.id] <= 0) return
+
+      setTerritories((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, troops: t.troops + 1 } : t
+        )
+      )
+      setReinforcements((prev) => ({
+        ...prev,
+        [currentPlayer.id]: prev[currentPlayer.id] - 1,
+      }))
+      nextTurn()
+    }
   }
 
   const getOwnerColor = (ownerId) => {
