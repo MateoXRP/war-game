@@ -221,6 +221,7 @@ export function handleCpuTurn({
 
     function getAdjacentToConnectorCandidates(unclaimed, preferredContinent) {
       const results = []
+      const validContinents = new Set(getAdjacentContinents(preferredContinent))
 
       for (const [a, b] of connectorPairs) {
         const connectorId = (getContinent(a) === preferredContinent) ? b :
@@ -228,10 +229,15 @@ export function handleCpuTurn({
 
         if (!connectorId) continue
 
+        const connectorContinent = getContinent(connectorId)
+        if (!validContinents.has(connectorContinent)) continue
+
         const neighbors = adjacencyMap[connectorId] || []
         for (const neighborId of neighbors) {
           const tile = unclaimed.find((t) => t.id === neighborId)
-          if (tile) results.push(tile)
+          if (tile && validContinents.has(tile.continent)) {
+            results.push(tile)
+          }
         }
       }
 
