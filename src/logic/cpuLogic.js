@@ -4,13 +4,23 @@ const cpuMemory = {
 }
 
 const entryPointsByContinent = {
-  "North America": ["na6", "na8"],        // NYC, Costa Rica
-  "Europe": ["eu4", "eu8", "eu6"],        // GBR, France, Ukraine
-  "Asia": ["as4", "as8"],                 // Afghanistan, Thailand
-  "South America": ["sa2", "sa6"],        // Columbia, Brazil
-  "Africa": ["af2", "af4", "af6"],        // Libya, Nigeria, Somalia
-  "Australia": ["au2", "au4"],            // Philippines, W Australia
+  "North America": ["na6", "na8"],
+  "Europe": ["eu4", "eu8", "eu6"],
+  "Asia": ["as4", "as8"],
+  "South America": ["sa2", "sa6"],
+  "Africa": ["af2", "af4", "af6"],
+  "Australia": ["au2", "au4"],
 }
+
+const connectorPairs = [
+  ["na8", "sa2"], // Costa Rica ⇄ Columbia
+  ["na6", "eu4"], // NYC ⇄ GBR
+  ["eu6", "as4"], // Ukraine ⇄ Afghanistan
+  ["eu8", "af2"], // France ⇄ Libya
+  ["as8", "au2"], // Thailand ⇄ Philippines
+  ["sa6", "af4"], // Brazil ⇄ Nigeria
+  ["af6", "au4"], // Somalia ⇄ W Australia
+]
 
 export function handleCpuTurn({
   territories,
@@ -28,7 +38,6 @@ export function handleCpuTurn({
       return handleReinforcementPhase()
     }
 
-    // --- Placement Phase ---
     function handleClaimPhase() {
       const unclaimed = territories.filter((t) => !t.owner)
       if (unclaimed.length === 0) return
@@ -45,29 +54,35 @@ export function handleCpuTurn({
         }
       }
 
-      const target = memory.continent
+      const preferredContinent = memory.continent
 
-      if (target) {
-        const targetTerritories = continentMap[target].filter((t) => !t.owner)
-        if (targetTerritories.length > 0) {
-          return claim(randomPick(targetTerritories))
-        }
+      // 1. Try unclaimed in preferred continent
+      const preferredUnclaimed = continentMap[preferredContinent]?.filter((t) => !t.owner)
+      if (preferredUnclaimed?.length > 0) {
+        return claim(randomPick(preferredUnclaimed))
       }
 
-      const contested = unclaimed.filter((t) => {
-        const owners = new Set(
-          territories
-            .filter((x) => x.continent === t.continent && x.owner)
-            .map((x) => x.owner)
-        )
-        return owners.size === 1 && !owners.has(currentPlayer.id)
-      })
+      // 2. Try connector territory in another continent that connects to preferred continent
+      const connectorCandidates = unclaimed.filter((t) =>
+        isConnectorToPreferredContinent(t.id, preferredContinent)
+      )
+      if (connectorCandidates.length > 0) {
+        return claim(randomPick(connectorCandidates))
+      }
 
-      if (contested.length > 0) return claim(randomPick(contested))
+      // 3. Try other adjacent continents (not exact connectors)
+      const adjacentContinents = getAdjacentContinents(preferredContinent)
+      const adjacentUnclaimed = unclaimed.filter((t) =>
+        adjacentContinents.includes(t.continent)
+      )
+      if (adjacentUnclaimed.length > 0) {
+        return claim(randomPick(adjacentUnclaimed))
+      }
+
+      // 4. Fallback
       return claim(randomPick(unclaimed))
     }
 
-    // --- Reinforcement Phase ---
     function handleReinforcementPhase() {
       const memory = cpuMemory[currentPlayer.id]
       const preferredContinent = memory.continent
@@ -95,17 +110,10 @@ export function handleCpuTurn({
         )
 
         const externalEntryPoints = owned.filter((t) =>
-          Object.entries(entryPointsByContinent).some(([continent, ids]) => {
-            if (continent === preferredContinent) return false
-            return ids.includes(t.id) &&
-              t.continent === continent &&
-              connectsTo(t.id, preferredContinent)
-          })
+          isConnectorToPreferredContinent(t.id, preferredContinent)
         )
 
         const merged = [...frontline, ...internalEntryPoints, ...externalEntryPoints]
-
-        // De-duplicate targets
         const seen = new Set()
         targets = merged.filter((t) => {
           if (seen.has(t.id)) return false
@@ -184,15 +192,32 @@ export function handleCpuTurn({
       return false
     }
 
-    function connectsTo(territoryId, targetContinent) {
-      return Object.entries(entryPointsByContinent).some(([sourceContinent, ids]) => {
-        return ids.includes(territoryId) &&
-          sourceContinent !== targetContinent &&
-          entryPointsByContinent[targetContinent]?.some(id => {
-            const target = territories.find(t => t.id === id)
-            return target?.continent === targetContinent
-          })
+    function isConnectorToPreferredContinent(id, preferredContinent) {
+      return connectorPairs.some(([a, b]) => {
+        const aContinent = getContinent(a)
+        const bContinent = getContinent(b)
+        if (a === id && bContinent === preferredContinent) return true
+        if (b === id && aContinent === preferredContinent) return true
+        return false
       })
+    }
+
+    function getContinent(id) {
+      const t = territories.find((x) => x.id === id)
+      return t?.continent || null
+    }
+
+    function getAdjacentContinents(targetContinent) {
+      const adjacent = new Set()
+      for (const [a, b] of connectorPairs) {
+        const aCont = getContinent(a)
+        const bCont = getContinent(b)
+        if (aCont === targetContinent && bCont && bCont !== targetContinent)
+          adjacent.add(bCont)
+        if (bCont === targetContinent && aCont && aCont !== targetContinent)
+          adjacent.add(aCont)
+      }
+      return [...adjacent]
     }
   }, 500)
 }
