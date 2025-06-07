@@ -1,9 +1,18 @@
 // src/logic/cpuLogic.js
 
-// In-memory target tracking per CPU
 const cpuMemory = {
-  cpu1: null,
-  cpu2: null,
+  cpu1: { continent: null, reinforceIndex: 0 },
+  cpu2: { continent: null, reinforceIndex: 0 },
+}
+
+// Manually specified entry points per your layout
+const entryPointsByContinent = {
+  "North America": ["na6", "na8"],        // NYC, Costa Rica
+  "Europe": ["eu4", "eu8", "eu6"],        // GBR, France, Ukraine
+  "Asia": ["as4", "as8"],                 // Afghanistan, Thailand
+  "South America": ["sa2", "sa6"],        // Columbia, Brazil
+  "Africa": ["af2", "af4", "af6"],        // Libya, Nigeria, Somalia
+  "Australia": ["au2", "au4"],            // Philippines, W Australia
 }
 
 export function handleCpuTurn({
@@ -17,76 +26,89 @@ export function handleCpuTurn({
   setReinforcements,
 }) {
   setTimeout(() => {
-    // ----- CLAIMING PHASE -----
-    if (isPlacementPhase) {
+    if (isPlacementPhase) return handleClaimPhase()
+    if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
+      return handleReinforcementPhase()
+    }
+
+    // --- Placement Phase ---
+    function handleClaimPhase() {
       const unclaimed = territories.filter((t) => !t.owner)
       if (unclaimed.length === 0) return
 
-      // Group by continent
-      const continentMap = {}
-      territories.forEach((t) => {
-        if (!continentMap[t.continent]) continentMap[t.continent] = []
-        continentMap[t.continent].push(t)
-      })
+      const continentMap = groupByContinent(territories)
+      const memory = cpuMemory[currentPlayer.id]
 
-      // Assign a target continent if not already assigned
-      if (!cpuMemory[currentPlayer.id]) {
+      // Assign preferred continent if not already
+      if (!memory.continent) {
         const emptyContinent = Object.entries(continentMap).find(
           ([, group]) => group.every((t) => !t.owner)
         )
         if (emptyContinent) {
-          cpuMemory[currentPlayer.id] = emptyContinent[0]
+          memory.continent = emptyContinent[0]
         }
       }
 
-      const target = cpuMemory[currentPlayer.id]
+      const target = memory.continent
 
-      // Try to claim unowned territory in the target continent
       if (target) {
         const targetTerritories = continentMap[target].filter((t) => !t.owner)
         if (targetTerritories.length > 0) {
-          const pick = randomPick(targetTerritories)
-          return commitClaim(pick)
+          return claim(randomPick(targetTerritories))
         }
       }
 
-      // Otherwise, try to block other players by picking from contested continents
-      const contestedTerritories = unclaimed.filter((t) => {
-        const continent = continentMap[t.continent]
-        const owners = new Set(continent.map((x) => x.owner).filter(Boolean))
-        return owners.size === 1 && [...owners][0] !== currentPlayer.id
+      // Try blocking other players
+      const contested = unclaimed.filter((t) => {
+        const owners = new Set(
+          territories
+            .filter((x) => x.continent === t.continent && x.owner)
+            .map((x) => x.owner)
+        )
+        return owners.size === 1 && !owners.has(currentPlayer.id)
       })
 
-      if (contestedTerritories.length > 0) {
-        const pick = randomPick(contestedTerritories)
-        return commitClaim(pick)
-      }
-
-      // Last resort: random pick
-      const pick = randomPick(unclaimed)
-      return commitClaim(pick)
+      if (contested.length > 0) return claim(randomPick(contested))
+      return claim(randomPick(unclaimed))
     }
 
-    // ----- REINFORCEMENT PHASE -----
-    else if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
+    // --- Reinforcement Phase ---
+    function handleReinforcementPhase() {
+      const memory = cpuMemory[currentPlayer.id]
+      const continent = memory.continent
       const owned = territories.filter((t) => t.owner === currentPlayer.id)
-      if (owned.length === 0) return
 
-      // Prioritize frontlines (territories adjacent to enemies)
-      const enemyTerritories = new Set(
-        territories.filter((t) => t.owner && t.owner !== currentPlayer.id).map((t) => t.continent)
-      )
+      const inContinent = owned.filter((t) => t.continent === continent)
+      const fullControl =
+        inContinent.length === 9 &&
+        territories
+          .filter((t) => t.continent === continent)
+          .every((t) => t.owner === currentPlayer.id)
 
-      const frontlines = owned.filter((t) =>
-        enemyTerritories.has(t.continent)
-      )
+      let targets = []
 
-      const reinforceTarget = randomPick(frontlines.length > 0 ? frontlines : owned)
+      if (fullControl) {
+        const entryIds = entryPointsByContinent[continent] || []
+        targets = inContinent.filter((t) => entryIds.includes(t.id))
+      } else {
+        const frontline = inContinent.filter((t) =>
+          isAdjacentToEnemy(t, territories, currentPlayer.id)
+        )
+        if (frontline.length > 0) targets = frontline
+      }
 
-      // Apply reinforcement
+      if (targets.length === 0) {
+        targets = owned
+      }
+
+      // Rotate through targets one per turn
+      const index = memory.reinforceIndex % targets.length
+      const target = targets[index]
+      memory.reinforceIndex++
+
       setTerritories((prev) =>
         prev.map((t) =>
-          t.id === reinforceTarget.id ? { ...t, troops: t.troops + 1 } : t
+          t.id === target.id ? { ...t, troops: t.troops + 1 } : t
         )
       )
       setReinforcements((prev) => ({
@@ -96,7 +118,7 @@ export function handleCpuTurn({
       nextTurn()
     }
 
-    function commitClaim(territory) {
+    function claim(territory) {
       setTerritories((prev) =>
         prev.map((t) =>
           t.id === territory.id
@@ -109,6 +131,41 @@ export function handleCpuTurn({
 
     function randomPick(arr) {
       return arr[Math.floor(Math.random() * arr.length)]
+    }
+
+    function groupByContinent(territories) {
+      const map = {}
+      for (const t of territories) {
+        if (!map[t.continent]) map[t.continent] = []
+        map[t.continent].push(t)
+      }
+      return map
+    }
+
+    function isAdjacentToEnemy(tile, all, cpuId) {
+      const continentTiles = all.filter((t) => t.continent === tile.continent)
+      const index = continentTiles.findIndex((t) => t.id === tile.id)
+      if (index === -1) return false
+
+      const row = Math.floor(index / 3)
+      const col = index % 3
+      const adjacentCoords = [
+        [row - 1, col],
+        [row + 1, col],
+        [row, col - 1],
+        [row, col + 1],
+      ]
+
+      for (const [r, c] of adjacentCoords) {
+        if (r >= 0 && r < 3 && c >= 0 && c < 3) {
+          const adjIndex = r * 3 + c
+          const adjTile = continentTiles[adjIndex]
+          if (adjTile && adjTile.owner && adjTile.owner !== cpuId) {
+            return true
+          }
+        }
+      }
+      return false
     }
   }, 500)
 }
