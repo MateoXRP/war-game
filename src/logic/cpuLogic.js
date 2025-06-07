@@ -13,13 +13,13 @@ const entryPointsByContinent = {
 }
 
 const connectorPairs = [
-  ["na8", "sa2"], // Costa Rica ⇄ Columbia
-  ["na6", "eu4"], // NYC ⇄ GBR
-  ["eu6", "as4"], // Ukraine ⇄ Afghanistan
-  ["eu8", "af2"], // France ⇄ Libya
-  ["as8", "au2"], // Thailand ⇄ Philippines
-  ["sa6", "af4"], // Brazil ⇄ Nigeria
-  ["af6", "au4"], // Somalia ⇄ W Australia
+  ["na8", "sa2"],
+  ["na6", "eu4"],
+  ["eu6", "as4"],
+  ["eu8", "af2"],
+  ["as8", "au2"],
+  ["sa6", "af4"],
+  ["af6", "au4"],
 ]
 
 export function handleCpuTurn({
@@ -56,13 +56,13 @@ export function handleCpuTurn({
 
       const preferredContinent = memory.continent
 
-      // 1. Try unclaimed in preferred continent
+      // 1. Unclaimed in preferred continent
       const preferredUnclaimed = continentMap[preferredContinent]?.filter((t) => !t.owner)
       if (preferredUnclaimed?.length > 0) {
         return claim(randomPick(preferredUnclaimed))
       }
 
-      // 2. Try connector territory in another continent that connects to preferred continent
+      // 2. Unclaimed connector territory to preferred continent
       const connectorCandidates = unclaimed.filter((t) =>
         isConnectorToPreferredContinent(t.id, preferredContinent)
       )
@@ -70,7 +70,13 @@ export function handleCpuTurn({
         return claim(randomPick(connectorCandidates))
       }
 
-      // 3. Try other adjacent continents (not exact connectors)
+      // 2.5. Adjacent to connectors to preferred continent
+      const adjacentToConnector = getAdjacentToConnectorCandidates(unclaimed, preferredContinent)
+      if (adjacentToConnector.length > 0) {
+        return claim(randomPick(adjacentToConnector))
+      }
+
+      // 3. Any unclaimed in adjacent continents
       const adjacentContinents = getAdjacentContinents(preferredContinent)
       const adjacentUnclaimed = unclaimed.filter((t) =>
         adjacentContinents.includes(t.continent)
@@ -218,6 +224,45 @@ export function handleCpuTurn({
           adjacent.add(aCont)
       }
       return [...adjacent]
+    }
+
+    function getAdjacentToConnectorCandidates(unclaimed, preferredContinent) {
+      const results = []
+
+      for (const [a, b] of connectorPairs) {
+        const connectorId = (getContinent(a) === preferredContinent) ? b :
+                            (getContinent(b) === preferredContinent) ? a : null
+
+        if (!connectorId) continue
+
+        const connectorTile = territories.find((t) => t.id === connectorId)
+        if (!connectorTile) continue
+
+        const continentTiles = territories.filter((t) => t.continent === connectorTile.continent)
+        const index = continentTiles.findIndex((t) => t.id === connectorId)
+        if (index === -1) continue
+
+        const row = Math.floor(index / 3)
+        const col = index % 3
+        const adjacentCoords = [
+          [row - 1, col],
+          [row + 1, col],
+          [row, col - 1],
+          [row, col + 1],
+        ]
+
+        for (const [r, c] of adjacentCoords) {
+          if (r >= 0 && r < 3 && c >= 0 && c < 3) {
+            const adjIndex = r * 3 + c
+            const adjTile = continentTiles[adjIndex]
+            if (adjTile && !adjTile.owner) {
+              results.push(adjTile)
+            }
+          }
+        }
+      }
+
+      return results
     }
   }, 500)
 }
