@@ -1,6 +1,7 @@
 // src/context/GameContext.jsx
 import { createContext, useContext, useState, useEffect } from "react"
 import { initialTerritories, players } from "../data/gameData"
+import { handleCpuTurn } from "../logic/cpuLogic"
 
 const GameContext = createContext()
 
@@ -19,6 +20,7 @@ export function GameProvider({ children }) {
     setTurnIndex((prev) => prev + 1)
   }
 
+  // Handle transition from placement to reinforcement phase
   useEffect(() => {
     const claimed = territories.filter((t) => t.owner).length
 
@@ -36,6 +38,7 @@ export function GameProvider({ children }) {
     }
   }, [territories, isPlacementPhase])
 
+  // Handle end of reinforcement phase
   useEffect(() => {
     if (
       isReinforcementPhase &&
@@ -44,6 +47,23 @@ export function GameProvider({ children }) {
       setIsReinforcementPhase(false)
     }
   }, [reinforcements, isReinforcementPhase])
+
+  // Trigger CPU move automatically
+  useEffect(() => {
+    const player = currentPlayer
+    if (player.isCPU && (isPlacementPhase || isReinforcementPhase)) {
+      handleCpuTurn({
+        territories,
+        setTerritories,
+        currentPlayer: player,
+        nextTurn,
+        isPlacementPhase,
+        isReinforcementPhase,
+        reinforcements,
+        setReinforcements,
+      })
+    }
+  }, [currentPlayer, isPlacementPhase, isReinforcementPhase])
 
   return (
     <GameContext.Provider
