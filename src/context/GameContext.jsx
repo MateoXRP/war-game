@@ -20,15 +20,19 @@ export function GameProvider({ children }) {
   const [troopsAwardedTurn, setTroopsAwardedTurn] = useState(-1)
   const [lastCpuPlacementTurn, setLastCpuPlacementTurn] = useState(null)
 
+  const [selectedSource, setSelectedSource] = useState(null)
+  const [selectedTarget, setSelectedTarget] = useState(null)
+
   const playerOrderRef = useRef(null)
 
   const currentPlayer = playerOrder ? playerOrder[turnIndex % playerOrder.length] : null
 
   const nextTurn = () => {
     setTurnIndex((prev) => prev + 1)
+    setSelectedSource(null)
+    setSelectedTarget(null)
   }
 
-  // Determine turn order once and assign initial reinforcements
   useEffect(() => {
     if (!playerOrderRef.current) {
       const rolls = basePlayers.map(p => ({ ...p, roll: rollDie() }))
@@ -44,10 +48,8 @@ export function GameProvider({ children }) {
     }
   }, [])
 
-  // Transition from placement to reinforcement phase
   useEffect(() => {
     const claimed = territories.filter((t) => t.owner).length
-
     if (isPlacementPhase && claimed >= territories.length) {
       setIsPlacementPhase(false)
       setIsReinforcementPhase(true)
@@ -62,7 +64,6 @@ export function GameProvider({ children }) {
     }
   }, [territories, isPlacementPhase])
 
-  // Transition from reinforcement to turn phase
   useEffect(() => {
     if (
       isReinforcementPhase &&
@@ -73,11 +74,8 @@ export function GameProvider({ children }) {
     }
   }, [reinforcements, isReinforcementPhase])
 
-  // Award troops at start of each player's turn in turn phase
   useEffect(() => {
     if (isTurnPhase && currentPlayer && turnIndex !== troopsAwardedTurn) {
-      console.log(`=== Turn Phase started: ${currentPlayer.name} ===`)
-
       const owned = territories.filter(t => t.owner === currentPlayer.id)
       const ownedIds = new Set(owned.map(t => t.id))
 
@@ -102,8 +100,6 @@ export function GameProvider({ children }) {
       const baseTroops = Math.max(3, Math.floor(owned.length / 3))
       const total = baseTroops + continentBonus
 
-      console.log(`🪖 ${currentPlayer.name} awarded ${total} troops (${baseTroops} base + ${continentBonus} bonus)`)
-
       setReinforcements(prev => ({
         ...prev,
         [currentPlayer.id]: total,
@@ -112,15 +108,7 @@ export function GameProvider({ children }) {
     }
   }, [isTurnPhase, currentPlayer, territories, turnIndex, troopsAwardedTurn])
 
-  // CPU logic execution per phase
   useEffect(() => {
-    console.log("CPU TURN CHECK", {
-      currentPlayer,
-      isPlacementPhase,
-      isReinforcementPhase,
-      isTurnPhase,
-    })
-
     const isCpu = currentPlayer?.isCPU
     if (!isCpu) return
 
@@ -139,7 +127,6 @@ export function GameProvider({ children }) {
       }
 
       setTimeout(() => {
-        console.log("▶️ CPU logic running for:", currentPlayer.id)
         handleCpuTurn({
           territories,
           setTerritories,
@@ -163,6 +150,54 @@ export function GameProvider({ children }) {
     lastCpuPlacementTurn,
   ])
 
+  function resolveBattle(attackerId, defenderId) {
+    const attacker = territories.find((t) => t.id === attackerId)
+    const defender = territories.find((t) => t.id === defenderId)
+
+    if (!attacker || !defender) return
+    if (attacker.troops < 2) return
+
+    const attackerDice = Math.min(3, attacker.troops - 1)
+    const defenderDice = Math.min(2, defender.troops)
+
+    const attackRolls = Array.from({ length: attackerDice }, rollDie).sort((a, b) => b - a)
+    const defenseRolls = Array.from({ length: defenderDice }, rollDie).sort((a, b) => b - a)
+
+    let attackerLosses = 0
+    let defenderLosses = 0
+
+    for (let i = 0; i < Math.min(attackRolls.length, defenseRolls.length); i++) {
+      if (attackRolls[i] > defenseRolls[i]) {
+        defenderLosses++
+      } else {
+        attackerLosses++
+      }
+    }
+
+    setTerritories((prev) =>
+      prev.map((t) => {
+        if (t.id === attacker.id) {
+          return { ...t, troops: t.troops - attackerLosses }
+        }
+        if (t.id === defender.id) {
+          const remainingTroops = t.troops - defenderLosses
+          if (remainingTroops <= 0) {
+            return {
+              ...t,
+              owner: attacker.owner,
+              troops: attackerDice - attackerLosses,
+            }
+          }
+          return { ...t, troops: remainingTroops }
+        }
+        return t
+      })
+    )
+
+    setSelectedSource(null)
+    setSelectedTarget(null)
+  }
+
   return (
     <GameContext.Provider
       value={{
@@ -176,6 +211,11 @@ export function GameProvider({ children }) {
         isTurnPhase,
         reinforcements,
         setReinforcements,
+        selectedSource,
+        setSelectedSource,
+        selectedTarget,
+        setSelectedTarget,
+        resolveBattle,
       }}
     >
       {children}

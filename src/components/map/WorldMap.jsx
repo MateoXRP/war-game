@@ -1,5 +1,6 @@
 // src/components/map/WorldMap.jsx
 import { useGame } from "../../context/GameContext"
+import { adjacencyMap } from "../../data/territoryGraph"
 
 function WorldMap() {
   const {
@@ -12,6 +13,11 @@ function WorldMap() {
     isTurnPhase,
     reinforcements,
     setReinforcements,
+    selectedSource,
+    setSelectedSource,
+    selectedTarget,
+    setSelectedTarget,
+    resolveBattle,
   } = useGame()
 
   const handleClick = (id) => {
@@ -29,7 +35,7 @@ function WorldMap() {
       nextTurn()
     }
 
-    // Phase 2: Reinforcement (rotating one troop per player)
+    // Phase 2: Reinforcement
     else if (isReinforcementPhase) {
       if (target.owner !== currentPlayer.id) return
       if (reinforcements[currentPlayer.id] <= 0) return
@@ -51,20 +57,44 @@ function WorldMap() {
       })
     }
 
-    // Phase 3: Turn Phase (manual troop drop, same player continues)
+    // Phase 3: Turn Phase — troop placement or attack
     else if (isTurnPhase) {
-      if (target.owner !== currentPlayer.id) return
-      if (reinforcements[currentPlayer.id] <= 0) return
-
-      setTerritories((prev) =>
-        prev.map((t) =>
-          t.id === id ? { ...t, troops: t.troops + 1 } : t
+      // Troop placement
+      if (target.owner === currentPlayer.id && reinforcements[currentPlayer.id] > 0) {
+        setTerritories((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, troops: t.troops + 1 } : t
+          )
         )
-      )
-      setReinforcements((prev) => ({
-        ...prev,
-        [currentPlayer.id]: prev[currentPlayer.id] - 1,
-      }))
+        setReinforcements((prev) => ({
+          ...prev,
+          [currentPlayer.id]: prev[currentPlayer.id] - 1,
+        }))
+        return
+      }
+
+      // Attack selection
+      if (!selectedSource) {
+        if (target.owner === currentPlayer.id && target.troops > 1) {
+          setSelectedSource(target.id)
+        }
+      } else {
+        const source = state.find((t) => t.id === selectedSource)
+        const neighbors = adjacencyMap[selectedSource] || []
+
+        const isValidTarget =
+          neighbors.includes(target.id) &&
+          target.owner &&
+          target.owner !== currentPlayer.id
+
+        if (isValidTarget) {
+          setSelectedTarget(target.id)
+          resolveBattle(selectedSource, target.id)
+        } else if (target.id === selectedSource) {
+          // Cancel selection if clicked again
+          setSelectedSource(null)
+        }
+      }
     }
   }
 
@@ -122,14 +152,12 @@ function WorldMap() {
 
   return (
     <div className="flex flex-col items-center space-y-2">
-      {/* Turn Phase troop counter */}
       {isTurnPhase && currentPlayer?.id === "human" && (
         <div className="text-white font-bold text-lg">
           💂 Troops remaining: {reinforcements[currentPlayer.id] || 0}
         </div>
       )}
 
-      {/* End Turn button */}
       {showEndTurn && (
         <button
           onClick={nextTurn}
@@ -184,6 +212,18 @@ function WorldMap() {
           const fillClass = getOwnerColor(t.owner)
           const troopCount = t.troops || 0
 
+          let highlight = ""
+          if (selectedSource === t.id) {
+            highlight = "stroke-yellow-400 stroke-4"
+          } else if (
+            selectedSource &&
+            adjacencyMap[selectedSource]?.includes(t.id) &&
+            t.owner &&
+            t.owner !== currentPlayer.id
+          ) {
+            highlight = "stroke-red-400 stroke-2"
+          }
+
           return (
             <g key={t.id} onClick={() => handleClick(t.id)} className="cursor-pointer">
               <rect
@@ -192,7 +232,7 @@ function WorldMap() {
                 width={120}
                 height={100}
                 rx="10"
-                className={`${fillClass} stroke-white stroke-2`}
+                className={`${fillClass} stroke-white stroke-2 ${highlight}`}
               />
               <text
                 x={pos.x + 60}
