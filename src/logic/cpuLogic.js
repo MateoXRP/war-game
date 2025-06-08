@@ -1,9 +1,12 @@
+// src/logic/cpuLogic.js
+
 const cpuMemory = {
   cpu1: { continent: null, reinforceIndex: 0 },
   cpu2: { continent: null, reinforceIndex: 0 },
 }
 
 const adjacencyMap = {
+  // (Same content as before — full adjacency map preserved)
   na1: ["na2", "na4"],
   na2: ["na1", "na3", "na5"],
   na3: ["na2", "na6"],
@@ -60,11 +63,11 @@ const adjacencyMap = {
   au9: ["au6", "au8"],
 }
 
-const isAdjacentToEnemy = (tileId, territories, cpuId) => {
-  const neighbors = adjacencyMap[tileId] || []
-  return neighbors.some((id) => {
-    const tile = territories.find((t) => t.id === id)
-    return tile && tile.owner && tile.owner !== cpuId
+function isAdjacentToEnemy(id, allTerritories, cpuId) {
+  const neighbors = adjacencyMap[id] || []
+  return neighbors.some((neighborId) => {
+    const neighbor = allTerritories.find((t) => t.id === neighborId)
+    return neighbor && neighbor.owner && neighbor.owner !== cpuId
   })
 }
 
@@ -78,60 +81,66 @@ export function handleCpuTurn({
   reinforcements,
   setReinforcements,
 }) {
-  setTimeout(() => {
-    if (isPlacementPhase) return handleClaimPhase()
-    if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
-      return handleReinforcementPhase()
+  if (isPlacementPhase) return handleClaimPhase()
+  if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
+    return handleReinforcementLoop()
+  }
+
+  function handleClaimPhase() {
+    const unclaimed = territories.filter((t) => !t.owner)
+    if (unclaimed.length === 0) return
+
+    const continentMap = groupByContinent(territories)
+    const memory = cpuMemory[currentPlayer.id]
+
+    if (!memory.continent) {
+      const emptyContinent = Object.entries(continentMap).find(
+        ([, group]) => group.every((t) => !t.owner)
+      )
+      if (emptyContinent) {
+        memory.continent = emptyContinent[0]
+      }
     }
 
-    function handleClaimPhase() {
-      const unclaimed = territories.filter((t) => !t.owner)
-      if (unclaimed.length === 0) return
+    const preferredContinent = memory.continent
 
-      const continentMap = groupByContinent(territories)
-      const memory = cpuMemory[currentPlayer.id]
-
-      if (!memory.continent) {
-        const emptyContinent = Object.entries(continentMap).find(
-          ([, group]) => group.every((t) => !t.owner)
-        )
-        if (emptyContinent) {
-          memory.continent = emptyContinent[0]
-        }
-      }
-
-      const preferredContinent = memory.continent
-
-      const preferredUnclaimed = continentMap[preferredContinent]?.filter((t) => !t.owner)
-      if (preferredUnclaimed?.length > 0) {
-        return claim(randomPick(preferredUnclaimed))
-      }
-
-      const connectorCandidates = unclaimed.filter((t) =>
-        isConnectorToPreferredContinent(t.id, preferredContinent)
-      )
-      if (connectorCandidates.length > 0) {
-        return claim(randomPick(connectorCandidates))
-      }
-
-      const adjacentToConnector = getAdjacentToConnectorCandidates(unclaimed, preferredContinent)
-      if (adjacentToConnector.length > 0) {
-        return claim(randomPick(adjacentToConnector))
-      }
-
-      const adjacentContinents = getAdjacentContinents(preferredContinent)
-      const adjacentUnclaimed = unclaimed.filter((t) =>
-        adjacentContinents.includes(t.continent)
-      )
-      if (adjacentUnclaimed.length > 0) {
-        return claim(randomPick(adjacentUnclaimed))
-      }
-
-      return claim(randomPick(unclaimed))
+    const preferredUnclaimed = continentMap[preferredContinent]?.filter((t) => !t.owner)
+    if (preferredUnclaimed?.length > 0) {
+      return claim(randomPick(preferredUnclaimed))
     }
 
-    function handleReinforcementPhase() {
-      const memory = cpuMemory[currentPlayer.id]
+    const connectorCandidates = unclaimed.filter((t) =>
+      isConnectorToPreferredContinent(t.id, preferredContinent)
+    )
+    if (connectorCandidates.length > 0) {
+      return claim(randomPick(connectorCandidates))
+    }
+
+    const adjacentToConnector = getAdjacentToConnectorCandidates(unclaimed, preferredContinent)
+    if (adjacentToConnector.length > 0) {
+      return claim(randomPick(adjacentToConnector))
+    }
+
+    const adjacentContinents = getAdjacentContinents(preferredContinent)
+    const adjacentUnclaimed = unclaimed.filter((t) =>
+      adjacentContinents.includes(t.continent)
+    )
+    if (adjacentUnclaimed.length > 0) {
+      return claim(randomPick(adjacentUnclaimed))
+    }
+
+    return claim(randomPick(unclaimed))
+  }
+
+  function handleReinforcementLoop() {
+    const memory = cpuMemory[currentPlayer.id]
+
+    const placeOneTroop = () => {
+      if (reinforcements[currentPlayer.id] <= 0) {
+        console.log(`⚠️ CPU ${currentPlayer.id} has no reinforcements`)
+        return
+      }
+
       const owned = territories.filter((t) => t.owner === currentPlayer.id)
 
       const frontline = owned.filter((t) =>
@@ -160,90 +169,96 @@ export function handleCpuTurn({
           t.id === target.id ? { ...t, troops: t.troops + 1 } : t
         )
       )
-      setReinforcements((prev) => ({
-        ...prev,
-        [currentPlayer.id]: prev[currentPlayer.id] - 1,
-      }))
-      nextTurn()
-    }
 
-    function claim(territory) {
-      setTerritories((prev) =>
-        prev.map((t) =>
-          t.id === territory.id
-            ? { ...t, owner: currentPlayer.id, troops: 1 }
-            : t
-        )
-      )
-      nextTurn()
-    }
-
-    function randomPick(arr) {
-      return arr[Math.floor(Math.random() * arr.length)]
-    }
-
-    function groupByContinent(territories) {
-      const map = {}
-      for (const t of territories) {
-        if (!map[t.continent]) map[t.continent] = []
-        map[t.continent].push(t)
-      }
-      return map
-    }
-
-    function isConnectorToPreferredContinent(id, preferredContinent) {
-      return connectorPairs.some(([a, b]) => {
-        const aContinent = getContinent(a)
-        const bContinent = getContinent(b)
-        if (a === id && bContinent === preferredContinent) return true
-        if (b === id && aContinent === preferredContinent) return true
-        return false
+      setReinforcements((prev) => {
+        const remaining = prev[currentPlayer.id] - 1
+        nextTurn()
+        return {
+          ...prev,
+          [currentPlayer.id]: remaining,
+        }
       })
     }
 
-    function getContinent(id) {
-      const t = territories.find((x) => x.id === id)
-      return t?.continent || null
+    setTimeout(placeOneTroop, 200)
+  }
+
+  function claim(territory) {
+    setTerritories((prev) =>
+      prev.map((t) =>
+        t.id === territory.id
+          ? { ...t, owner: currentPlayer.id, troops: 1 }
+          : t
+      )
+    )
+    nextTurn()
+  }
+
+  function randomPick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)]
+  }
+
+  function groupByContinent(territories) {
+    const map = {}
+    for (const t of territories) {
+      if (!map[t.continent]) map[t.continent] = []
+      map[t.continent].push(t)
     }
+    return map
+  }
 
-    function getAdjacentContinents(targetContinent) {
-      const adjacent = new Set()
-      for (const [a, b] of connectorPairs) {
-        const aCont = getContinent(a)
-        const bCont = getContinent(b)
-        if (aCont === targetContinent && bCont && bCont !== targetContinent)
-          adjacent.add(bCont)
-        if (bCont === targetContinent && aCont && aCont !== targetContinent)
-          adjacent.add(aCont)
-      }
-      return [...adjacent]
+  function isConnectorToPreferredContinent(id, preferredContinent) {
+    return connectorPairs.some(([a, b]) => {
+      const aContinent = getContinent(a)
+      const bContinent = getContinent(b)
+      if (a === id && bContinent === preferredContinent) return true
+      if (b === id && aContinent === preferredContinent) return true
+      return false
+    })
+  }
+
+  function getContinent(id) {
+    const t = territories.find((x) => x.id === id)
+    return t?.continent || null
+  }
+
+  function getAdjacentContinents(targetContinent) {
+    const adjacent = new Set()
+    for (const [a, b] of connectorPairs) {
+      const aCont = getContinent(a)
+      const bCont = getContinent(b)
+      if (aCont === targetContinent && bCont && bCont !== targetContinent)
+        adjacent.add(bCont)
+      if (bCont === targetContinent && aCont && aCont !== targetContinent)
+        adjacent.add(aCont)
     }
+    return [...adjacent]
+  }
 
-    function getAdjacentToConnectorCandidates(unclaimed, preferredContinent) {
-      const results = []
-      const validContinents = new Set(getAdjacentContinents(preferredContinent))
+  function getAdjacentToConnectorCandidates(unclaimed, preferredContinent) {
+    const results = []
+    const validContinents = new Set(getAdjacentContinents(preferredContinent))
 
-      for (const [a, b] of connectorPairs) {
-        const connectorId = (getContinent(a) === preferredContinent) ? b :
-                            (getContinent(b) === preferredContinent) ? a : null
+    for (const [a, b] of connectorPairs) {
+      const connectorId = (getContinent(a) === preferredContinent) ? b :
+                          (getContinent(b) === preferredContinent) ? a : null
 
-        if (!connectorId) continue
+      if (!connectorId) continue
 
-        const connectorContinent = getContinent(connectorId)
-        if (!validContinents.has(connectorContinent)) continue
+      const connectorContinent = getContinent(connectorId)
+      if (!validContinents.has(connectorContinent)) continue
 
-        const neighbors = adjacencyMap[connectorId] || []
-        for (const neighborId of neighbors) {
-          const tile = unclaimed.find((t) => t.id === neighborId)
-          if (tile && validContinents.has(tile.continent)) {
-            results.push(tile)
-          }
+      const neighbors = adjacencyMap[connectorId] || []
+      for (const neighborId of neighbors) {
+        const tile = unclaimed.find((t) => t.id === neighborId)
+        if (tile && validContinents.has(tile.continent)) {
+          results.push(tile)
         }
       }
-
-      return results
     }
-  }, 500)
+
+    return results
+  }
 }
 
 const entryPointsByContinent = {

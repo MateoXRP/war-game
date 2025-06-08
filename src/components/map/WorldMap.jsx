@@ -9,6 +9,7 @@ function WorldMap() {
     nextTurn,
     isPlacementPhase,
     isReinforcementPhase,
+    isTurnPhase,
     reinforcements,
     setReinforcements,
   } = useGame()
@@ -28,8 +29,30 @@ function WorldMap() {
       nextTurn()
     }
 
-    // Phase 2: Reinforcements
+    // Phase 2: Reinforcement (rotating one troop per player)
     else if (isReinforcementPhase) {
+      if (target.owner !== currentPlayer.id) return
+      if (reinforcements[currentPlayer.id] <= 0) return
+
+      setTerritories((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, troops: t.troops + 1 } : t
+        )
+      )
+
+      setReinforcements((prev) => {
+        const remaining = prev[currentPlayer.id] - 1
+        const updated = {
+          ...prev,
+          [currentPlayer.id]: remaining,
+        }
+        nextTurn()
+        return updated
+      })
+    }
+
+    // Phase 3: Turn Phase (manual troop drop, same player continues)
+    else if (isTurnPhase) {
       if (target.owner !== currentPlayer.id) return
       if (reinforcements[currentPlayer.id] <= 0) return
 
@@ -42,7 +65,6 @@ function WorldMap() {
         ...prev,
         [currentPlayer.id]: prev[currentPlayer.id] - 1,
       }))
-      nextTurn()
     }
   }
 
@@ -93,105 +115,129 @@ function WorldMap() {
     ["af5", "au5"],
   ]
 
+  const showEndTurn =
+    isTurnPhase &&
+    currentPlayer?.id === "human" &&
+    reinforcements[currentPlayer.id] === 0
+
   return (
-    <svg
-      viewBox="0 0 1350 900"
-      width="1100"
-      height="750"
-      className="rounded-xl bg-blue-800 mx-auto mb-2"
-    >
-      {centerLines.map(([from, to], index) => {
-        const a = positions[from]
-        const b = positions[to]
-        if (!a || !b) return null
+    <div className="flex flex-col items-center space-y-2">
+      {/* Turn Phase troop counter */}
+      {isTurnPhase && currentPlayer?.id === "human" && (
+        <div className="text-white font-bold text-lg">
+          💂 Troops remaining: {reinforcements[currentPlayer.id] || 0}
+        </div>
+      )}
 
-        const midX = (a.x + b.x) / 2 + 60
-        const midY = (a.y + b.y) / 2 + 50
+      {/* End Turn button */}
+      {showEndTurn && (
+        <button
+          onClick={nextTurn}
+          className="bg-yellow-500 text-black font-bold px-4 py-2 rounded-lg shadow-lg"
+        >
+          End Turn
+        </button>
+      )}
 
-        return (
-          <>
-            <line
-              key={`${index}-a`}
-              x1={(a.x + 60 + midX) / 2}
-              y1={(a.y + 50 + midY) / 2}
-              x2={midX}
-              y2={midY}
-              stroke="yellow"
-              strokeWidth="3"
-            />
-            <line
-              key={`${index}-b`}
-              x1={(b.x + 60 + midX) / 2}
-              y1={(b.y + 50 + midY) / 2}
-              x2={midX}
-              y2={midY}
-              stroke="yellow"
-              strokeWidth="3"
-            />
-          </>
-        )
-      })}
+      <svg
+        viewBox="0 0 1350 900"
+        width="1100"
+        height="750"
+        className="rounded-xl bg-blue-800 mx-auto mb-2"
+      >
+        {centerLines.map(([from, to], index) => {
+          const a = positions[from]
+          const b = positions[to]
+          if (!a || !b) return null
 
-      {state.map((t) => {
-        const pos = positions[t.id]
-        if (!pos) return null
+          const midX = (a.x + b.x) / 2 + 60
+          const midY = (a.y + b.y) / 2 + 50
 
-        const fillClass = getOwnerColor(t.owner)
-        const troopCount = t.troops || 0
+          return (
+            <>
+              <line
+                key={`${index}-a`}
+                x1={(a.x + 60 + midX) / 2}
+                y1={(a.y + 50 + midY) / 2}
+                x2={midX}
+                y2={midY}
+                stroke="yellow"
+                strokeWidth="3"
+              />
+              <line
+                key={`${index}-b`}
+                x1={(b.x + 60 + midX) / 2}
+                y1={(b.y + 50 + midY) / 2}
+                x2={midX}
+                y2={midY}
+                stroke="yellow"
+                strokeWidth="3"
+              />
+            </>
+          )
+        })}
 
-        return (
-          <g key={t.id} onClick={() => handleClick(t.id)} className="cursor-pointer">
-            <rect
-              x={pos.x}
-              y={pos.y}
-              width={120}
-              height={100}
-              rx="10"
-              className={`${fillClass} stroke-white stroke-2`}
-            />
-            <text
-              x={pos.x + 60}
-              y={pos.y + 60}
-              textAnchor="middle"
-              fill="white"
-              fontSize="12"
-              fontWeight="bold"
-            >
-              {t.name} ({troopCount})
-            </text>
-          </g>
-        )
-      })}
+        {state.map((t) => {
+          const pos = positions[t.id]
+          if (!pos) return null
 
-      {Object.entries(continentOffsets).map(([name, offset]) => {
-        const labelX = (offset.x + 1.5) * gridSpacing + globalOffset.x
-        const labelY = offset.y * gridSpacing + globalOffset.y - 20
+          const fillClass = getOwnerColor(t.owner)
+          const troopCount = t.troops || 0
 
-        return (
-          <g key={name}>
-            <rect
-              x={labelX - 60}
-              y={labelY - 14}
-              width={120}
-              height={28}
-              rx="6"
-              fill="black"
-            />
-            <text
-              x={labelX}
-              y={labelY}
-              textAnchor="middle"
-              fontSize="16"
-              fill="white"
-              fontWeight="bold"
-              dominantBaseline="middle"
-            >
-              {name}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
+          return (
+            <g key={t.id} onClick={() => handleClick(t.id)} className="cursor-pointer">
+              <rect
+                x={pos.x}
+                y={pos.y}
+                width={120}
+                height={100}
+                rx="10"
+                className={`${fillClass} stroke-white stroke-2`}
+              />
+              <text
+                x={pos.x + 60}
+                y={pos.y + 60}
+                textAnchor="middle"
+                fill="white"
+                fontSize="12"
+                fontWeight="bold"
+              >
+                {t.name} ({troopCount})
+              </text>
+            </g>
+          )
+        })}
+
+        {Object.entries(continentOffsets).map(([name, offset]) => {
+          const labelX = (offset.x + 1.5) * gridSpacing + globalOffset.x
+          const labelY = offset.y * gridSpacing + globalOffset.y - 20
+
+          return (
+            <g key={name}>
+              <rect
+                x={labelX - 60}
+                y={labelY - 14}
+                width={120}
+                height={28}
+                rx="6"
+                fill="black"
+              />
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                fontSize="16"
+                fill="white"
+                fontWeight="bold"
+                dominantBaseline="middle"
+              >
+                {name}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
   )
 }
 
