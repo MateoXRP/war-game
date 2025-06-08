@@ -1,66 +1,13 @@
 // src/logic/cpuLogic.js
+import {
+  adjacencyMap,
+  connectorPairs,
+  entryPointsByContinent,
+} from "../data/territoryGraph"
 
 const cpuMemory = {
   cpu1: { continent: null, reinforceIndex: 0 },
   cpu2: { continent: null, reinforceIndex: 0 },
-}
-
-const adjacencyMap = {
-  // (Same content as before — full adjacency map preserved)
-  na1: ["na2", "na4"],
-  na2: ["na1", "na3", "na5"],
-  na3: ["na2", "na6"],
-  na4: ["na1", "na5", "na7"],
-  na5: ["na2", "na4", "na6", "na8"],
-  na6: ["na3", "na5", "na9", "eu4"],
-  na7: ["na4", "na8"],
-  na8: ["na5", "na7", "na9", "sa2"],
-  na9: ["na6", "na8"],
-  eu1: ["eu2", "eu4"],
-  eu2: ["eu1", "eu3", "eu5"],
-  eu3: ["eu2", "eu6"],
-  eu4: ["eu1", "eu5", "eu7", "na6"],
-  eu5: ["eu2", "eu4", "eu6", "eu8"],
-  eu6: ["eu3", "eu5", "eu9", "as4"],
-  eu7: ["eu4", "eu8"],
-  eu8: ["eu5", "eu7", "eu9", "af2"],
-  eu9: ["eu6", "eu8"],
-  as1: ["as2", "as4"],
-  as2: ["as1", "as3", "as5"],
-  as3: ["as2", "as6"],
-  as4: ["as1", "as5", "as7", "eu6"],
-  as5: ["as2", "as4", "as6", "as8"],
-  as6: ["as3", "as5", "as9"],
-  as7: ["as4", "as8"],
-  as8: ["as5", "as7", "as9", "au2"],
-  as9: ["as6", "as8"],
-  sa1: ["sa2", "sa4"],
-  sa2: ["sa1", "sa3", "sa5", "na8"],
-  sa3: ["sa2", "sa6"],
-  sa4: ["sa1", "sa5", "sa7"],
-  sa5: ["sa2", "sa4", "sa6", "sa8"],
-  sa6: ["sa3", "sa5", "sa9", "af4"],
-  sa7: ["sa4", "sa8"],
-  sa8: ["sa5", "sa7", "sa9"],
-  sa9: ["sa6", "sa8"],
-  af1: ["af2", "af4"],
-  af2: ["af1", "af3", "af5", "eu8"],
-  af3: ["af2", "af6"],
-  af4: ["af1", "af5", "af7", "sa6"],
-  af5: ["af2", "af4", "af6", "af8"],
-  af6: ["af3", "af5", "af9", "au4"],
-  af7: ["af4", "af8"],
-  af8: ["af5", "af7", "af9"],
-  af9: ["af6", "af8"],
-  au1: ["au2", "au4"],
-  au2: ["au1", "au3", "au5", "as8"],
-  au3: ["au2", "au6"],
-  au4: ["au1", "au5", "au7", "af6"],
-  au5: ["au2", "au4", "au6", "au8"],
-  au6: ["au3", "au5", "au9"],
-  au7: ["au4", "au8"],
-  au8: ["au5", "au7", "au9"],
-  au9: ["au6", "au8"],
 }
 
 function isAdjacentToEnemy(id, allTerritories, cpuId) {
@@ -136,13 +83,9 @@ export function handleCpuTurn({
     const memory = cpuMemory[currentPlayer.id]
 
     const placeOneTroop = () => {
-      if (reinforcements[currentPlayer.id] <= 0) {
-        console.log(`⚠️ CPU ${currentPlayer.id} has no reinforcements`)
-        return
-      }
+      if (reinforcements[currentPlayer.id] <= 0) return
 
       const owned = territories.filter((t) => t.owner === currentPlayer.id)
-
       const frontline = owned.filter((t) =>
         isAdjacentToEnemy(t.id, territories, currentPlayer.id)
       )
@@ -260,23 +203,4 @@ export function handleCpuTurn({
     return results
   }
 }
-
-const entryPointsByContinent = {
-  "North America": ["na6", "na8"],
-  "Europe": ["eu4", "eu8", "eu6"],
-  "Asia": ["as4", "as8"],
-  "South America": ["sa2", "sa6"],
-  "Africa": ["af2", "af4", "af6"],
-  "Australia": ["au2", "au4"],
-}
-
-const connectorPairs = [
-  ["na8", "sa2"],
-  ["na6", "eu4"],
-  ["eu6", "as4"],
-  ["eu8", "af2"],
-  ["as8", "au2"],
-  ["sa6", "af4"],
-  ["af6", "au4"],
-]
 
