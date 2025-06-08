@@ -1,5 +1,5 @@
 // src/context/GameContext.jsx
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { initialTerritories, players as basePlayers } from "../data/gameData"
 import { handleCpuTurn } from "../logic/cpuLogic"
 
@@ -18,6 +18,9 @@ export function GameProvider({ children }) {
   const [isTurnPhase, setIsTurnPhase] = useState(false)
   const [reinforcements, setReinforcements] = useState({})
   const [troopsAwardedTurn, setTroopsAwardedTurn] = useState(-1)
+  const [lastCpuPlacementTurn, setLastCpuPlacementTurn] = useState(null)
+
+  const playerOrderRef = useRef(null)
 
   const currentPlayer = playerOrder ? playerOrder[turnIndex % playerOrder.length] : null
 
@@ -25,21 +28,23 @@ export function GameProvider({ children }) {
     setTurnIndex((prev) => prev + 1)
   }
 
+  // Determine turn order once and assign initial reinforcements
   useEffect(() => {
-    if (!playerOrder) {
+    if (!playerOrderRef.current) {
       const rolls = basePlayers.map(p => ({ ...p, roll: rollDie() }))
       rolls.sort((a, b) => b.roll - a.roll)
-      const ordered = [rolls[0], rolls[1], rolls[2]]
-      setPlayerOrder(ordered)
+      playerOrderRef.current = rolls
+      setPlayerOrder(rolls)
 
       const initialReinforcements = {}
-      ordered.forEach((p) => {
+      rolls.forEach((p) => {
         initialReinforcements[p.id] = 35
       })
       setReinforcements(initialReinforcements)
     }
-  }, [playerOrder])
+  }, [])
 
+  // Transition from placement to reinforcement phase
   useEffect(() => {
     const claimed = territories.filter((t) => t.owner).length
 
@@ -48,15 +53,16 @@ export function GameProvider({ children }) {
       setIsReinforcementPhase(true)
 
       const counts = {}
-      playerOrder.forEach((p) => {
+      playerOrderRef.current.forEach((p) => {
         const owned = territories.filter((t) => t.owner === p.id).length
         const remaining = 35 - owned
         counts[p.id] = Math.max(remaining, 0)
       })
       setReinforcements(counts)
     }
-  }, [territories, isPlacementPhase, playerOrder])
+  }, [territories, isPlacementPhase])
 
+  // Transition from reinforcement to turn phase
   useEffect(() => {
     if (
       isReinforcementPhase &&
@@ -67,6 +73,7 @@ export function GameProvider({ children }) {
     }
   }, [reinforcements, isReinforcementPhase])
 
+  // Award troops at start of each player's turn in turn phase
   useEffect(() => {
     if (isTurnPhase && currentPlayer && turnIndex !== troopsAwardedTurn) {
       console.log(`=== Turn Phase started: ${currentPlayer.name} ===`)
@@ -75,12 +82,12 @@ export function GameProvider({ children }) {
       const ownedIds = new Set(owned.map(t => t.id))
 
       const bonusByContinent = {
-        "North America": 5,
-        "Europe": 5,
-        "Asia": 7,
-        "South America": 2,
-        "Africa": 3,
-        "Australia": 2,
+        "North America": 4,
+        "Europe": 6,
+        "Asia": 4,
+        "South America": 4,
+        "Africa": 6,
+        "Australia": 4,
       }
 
       let continentBonus = 0
@@ -105,7 +112,7 @@ export function GameProvider({ children }) {
     }
   }, [isTurnPhase, currentPlayer, territories, turnIndex, troopsAwardedTurn])
 
-  // ✅ CPU logic trigger with delay across all phases
+  // CPU logic execution per phase
   useEffect(() => {
     console.log("CPU TURN CHECK", {
       currentPlayer,
@@ -114,8 +121,23 @@ export function GameProvider({ children }) {
       isTurnPhase,
     })
 
-    if (currentPlayer?.isCPU) {
-      const delay = 300
+    const isCpu = currentPlayer?.isCPU
+    if (!isCpu) return
+
+    const shouldRunPlacement =
+      isPlacementPhase && turnIndex !== lastCpuPlacementTurn
+
+    const shouldRunReinforcement =
+      isReinforcementPhase && reinforcements[currentPlayer.id] > 0
+
+    const shouldRunTurn =
+      isTurnPhase && reinforcements[currentPlayer.id] > 0
+
+    if (shouldRunPlacement || shouldRunReinforcement || shouldRunTurn) {
+      if (shouldRunPlacement) {
+        setLastCpuPlacementTurn(turnIndex)
+      }
+
       setTimeout(() => {
         console.log("▶️ CPU logic running for:", currentPlayer.id)
         handleCpuTurn({
@@ -125,12 +147,21 @@ export function GameProvider({ children }) {
           nextTurn,
           isPlacementPhase,
           isReinforcementPhase,
+          isTurnPhase,
           reinforcements,
           setReinforcements,
         })
-      }, delay)
+      }, 300)
     }
-  }, [currentPlayer, isPlacementPhase, isReinforcementPhase, isTurnPhase, reinforcements])
+  }, [
+    currentPlayer,
+    isPlacementPhase,
+    isReinforcementPhase,
+    isTurnPhase,
+    reinforcements,
+    turnIndex,
+    lastCpuPlacementTurn,
+  ])
 
   return (
     <GameContext.Provider

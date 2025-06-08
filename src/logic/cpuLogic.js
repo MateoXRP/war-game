@@ -6,8 +6,8 @@ import {
 } from "../data/territoryGraph"
 
 const cpuMemory = {
-  cpu1: { continent: null, reinforceIndex: 0 },
-  cpu2: { continent: null, reinforceIndex: 0 },
+  cpu1: { continent: null, reinforceIndex: 0, remainingTurnTroops: null, turnActive: false },
+  cpu2: { continent: null, reinforceIndex: 0, remainingTurnTroops: null, turnActive: false },
 }
 
 function isAdjacentToEnemy(id, allTerritories, cpuId) {
@@ -25,12 +25,16 @@ export function handleCpuTurn({
   nextTurn,
   isPlacementPhase,
   isReinforcementPhase,
+  isTurnPhase,
   reinforcements,
   setReinforcements,
 }) {
   if (isPlacementPhase) return handleClaimPhase()
   if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
     return handleReinforcementLoop()
+  }
+  if (isTurnPhase && reinforcements[currentPlayer.id] > 0) {
+    return handleTurnPhaseLoop()
   }
 
   function handleClaimPhase() {
@@ -50,31 +54,22 @@ export function handleCpuTurn({
     }
 
     const preferredContinent = memory.continent
-
     const preferredUnclaimed = continentMap[preferredContinent]?.filter((t) => !t.owner)
-    if (preferredUnclaimed?.length > 0) {
-      return claim(randomPick(preferredUnclaimed))
-    }
+    if (preferredUnclaimed?.length > 0) return claim(randomPick(preferredUnclaimed))
 
     const connectorCandidates = unclaimed.filter((t) =>
       isConnectorToPreferredContinent(t.id, preferredContinent)
     )
-    if (connectorCandidates.length > 0) {
-      return claim(randomPick(connectorCandidates))
-    }
+    if (connectorCandidates.length > 0) return claim(randomPick(connectorCandidates))
 
     const adjacentToConnector = getAdjacentToConnectorCandidates(unclaimed, preferredContinent)
-    if (adjacentToConnector.length > 0) {
-      return claim(randomPick(adjacentToConnector))
-    }
+    if (adjacentToConnector.length > 0) return claim(randomPick(adjacentToConnector))
 
     const adjacentContinents = getAdjacentContinents(preferredContinent)
     const adjacentUnclaimed = unclaimed.filter((t) =>
       adjacentContinents.includes(t.continent)
     )
-    if (adjacentUnclaimed.length > 0) {
-      return claim(randomPick(adjacentUnclaimed))
-    }
+    if (adjacentUnclaimed.length > 0) return claim(randomPick(adjacentUnclaimed))
 
     return claim(randomPick(unclaimed))
   }
@@ -126,6 +121,53 @@ export function handleCpuTurn({
     setTimeout(placeOneTroop, 200)
   }
 
+  function handleTurnPhaseLoop() {
+    const memory = cpuMemory[currentPlayer.id]
+
+    if (memory.turnActive) return
+    memory.turnActive = true
+
+    if (memory.remainingTurnTroops == null) {
+      memory.remainingTurnTroops = reinforcements[currentPlayer.id] || 0
+    }
+
+    const placeOneTroop = () => {
+      if (memory.remainingTurnTroops <= 0) {
+        memory.remainingTurnTroops = null
+        memory.turnActive = false
+        nextTurn()
+        return
+      }
+
+      const owned = territories.filter((t) => t.owner === currentPlayer.id)
+      const frontline = owned.filter((t) =>
+        isAdjacentToEnemy(t.id, territories, currentPlayer.id)
+      )
+
+      const targets = frontline.length > 0 ? frontline : owned
+      const index = memory.reinforceIndex % targets.length
+      const target = targets[index]
+      memory.reinforceIndex++
+
+      setTerritories((prev) =>
+        prev.map((t) =>
+          t.id === target.id ? { ...t, troops: t.troops + 1 } : t
+        )
+      )
+
+      memory.remainingTurnTroops--
+
+      setReinforcements((prev) => ({
+        ...prev,
+        [currentPlayer.id]: memory.remainingTurnTroops,
+      }))
+
+      setTimeout(placeOneTroop, 250)
+    }
+
+    placeOneTroop()
+  }
+
   function claim(territory) {
     setTerritories((prev) =>
       prev.map((t) =>
@@ -154,9 +196,10 @@ export function handleCpuTurn({
     return connectorPairs.some(([a, b]) => {
       const aContinent = getContinent(a)
       const bContinent = getContinent(b)
-      if (a === id && bContinent === preferredContinent) return true
-      if (b === id && aContinent === preferredContinent) return true
-      return false
+      return (
+        (a === id && bContinent === preferredContinent) ||
+        (b === id && aContinent === preferredContinent)
+      )
     })
   }
 
@@ -170,10 +213,8 @@ export function handleCpuTurn({
     for (const [a, b] of connectorPairs) {
       const aCont = getContinent(a)
       const bCont = getContinent(b)
-      if (aCont === targetContinent && bCont && bCont !== targetContinent)
-        adjacent.add(bCont)
-      if (bCont === targetContinent && aCont && aCont !== targetContinent)
-        adjacent.add(aCont)
+      if (aCont === targetContinent && bCont !== targetContinent) adjacent.add(bCont)
+      if (bCont === targetContinent && aCont !== targetContinent) adjacent.add(aCont)
     }
     return [...adjacent]
   }
@@ -183,8 +224,8 @@ export function handleCpuTurn({
     const validContinents = new Set(getAdjacentContinents(preferredContinent))
 
     for (const [a, b] of connectorPairs) {
-      const connectorId = (getContinent(a) === preferredContinent) ? b :
-                          (getContinent(b) === preferredContinent) ? a : null
+      const connectorId = getContinent(a) === preferredContinent ? b :
+                          getContinent(b) === preferredContinent ? a : null
 
       if (!connectorId) continue
 
