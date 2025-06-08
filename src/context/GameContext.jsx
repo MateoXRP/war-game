@@ -137,6 +137,7 @@ export function GameProvider({ children }) {
           isTurnPhase,
           reinforcements,
           setReinforcements,
+          resolveBattle, // ✅ FIX: Pass this so CPU can attack
         })
       }, 300)
     }

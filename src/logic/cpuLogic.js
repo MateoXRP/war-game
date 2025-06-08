@@ -28,6 +28,7 @@ export function handleCpuTurn({
   isTurnPhase,
   reinforcements,
   setReinforcements,
+  resolveBattle,
 }) {
   if (isPlacementPhase) return handleClaimPhase()
   if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
@@ -123,49 +124,47 @@ export function handleCpuTurn({
 
   function handleTurnPhaseLoop() {
     const memory = cpuMemory[currentPlayer.id]
-
     if (memory.turnActive) return
     memory.turnActive = true
 
-    if (memory.remainingTurnTroops == null) {
-      memory.remainingTurnTroops = reinforcements[currentPlayer.id] || 0
-    }
+    const performAttacks = () => {
+      const owned = territories.filter(t => t.owner === currentPlayer.id && t.troops > 1)
 
-    const placeOneTroop = () => {
-      if (memory.remainingTurnTroops <= 0) {
-        memory.remainingTurnTroops = null
+      const attackPairs = []
+      for (const from of owned) {
+        const neighbors = adjacencyMap[from.id] || []
+        const enemies = neighbors
+          .map(id => territories.find(t => t.id === id))
+          .filter(t => t && t.owner !== currentPlayer.id)
+        if (enemies.length > 0) {
+          const weakest = enemies.reduce((a, b) => (a.troops < b.troops ? a : b))
+          attackPairs.push({ from: from.id, to: weakest.id })
+        }
+      }
+
+      if (attackPairs.length === 0) {
         memory.turnActive = false
         nextTurn()
         return
       }
 
-      const owned = territories.filter((t) => t.owner === currentPlayer.id)
-      const frontline = owned.filter((t) =>
-        isAdjacentToEnemy(t.id, territories, currentPlayer.id)
+      const { from, to } = attackPairs[0]
+      const fromTerritory = territories.find(t => t.id === from)
+      const toTerritory = territories.find(t => t.id === to)
+
+      console.log(
+        `🪖 ${currentPlayer.name} attacks from ${fromTerritory.name} (${fromTerritory.troops}) → ${toTerritory.name} (${toTerritory.troops} owned by ${toTerritory.owner})`
       )
 
-      const targets = frontline.length > 0 ? frontline : owned
-      const index = memory.reinforceIndex % targets.length
-      const target = targets[index]
-      memory.reinforceIndex++
+      resolveBattle(from, to)
 
-      setTerritories((prev) =>
-        prev.map((t) =>
-          t.id === target.id ? { ...t, troops: t.troops + 1 } : t
-        )
-      )
-
-      memory.remainingTurnTroops--
-
-      setReinforcements((prev) => ({
-        ...prev,
-        [currentPlayer.id]: memory.remainingTurnTroops,
-      }))
-
-      setTimeout(placeOneTroop, 250)
+      setTimeout(() => {
+        memory.turnActive = false
+        nextTurn()
+      }, 350)
     }
 
-    placeOneTroop()
+    performAttacks()
   }
 
   function claim(territory) {
