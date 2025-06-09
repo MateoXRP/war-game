@@ -8,6 +8,7 @@ import {
   handleReinforcementToTurn,
   handleTurnStartTroops,
 } from "../logic/phaseLogic"
+import { useSelection } from "../hooks/useSelection"
 
 const GameContext = createContext()
 
@@ -26,8 +27,13 @@ export function GameProvider({ children }) {
   const [troopsAwardedTurn, setTroopsAwardedTurn] = useState(-1)
   const [lastCpuPlacementTurn, setLastCpuPlacementTurn] = useState(null)
 
-  const [selectedSource, setSelectedSource] = useState(null)
-  const [selectedTarget, setSelectedTarget] = useState(null)
+  const {
+    selectedSource,
+    setSelectedSource,
+    selectedTarget,
+    setSelectedTarget,
+    resetSelection,
+  } = useSelection()
 
   const [actionLog, setActionLog] = useState([])
 
@@ -41,8 +47,7 @@ export function GameProvider({ children }) {
 
   const nextTurn = () => {
     setTurnIndex((prev) => prev + 1)
-    setSelectedSource(null)
-    setSelectedTarget(null)
+    resetSelection()
   }
 
   // Initial setup: roll dice and assign reinforcements
@@ -153,6 +158,7 @@ export function GameProvider({ children }) {
       setSelectedSource,
       setSelectedTarget,
     })
+    resetSelection()
   }
 
   return (
