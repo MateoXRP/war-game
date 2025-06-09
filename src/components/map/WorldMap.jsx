@@ -1,6 +1,5 @@
-// src/components/map/WorldMap.jsx
 import { useGame } from "../../context/GameContext"
-import { adjacencyMap } from "../../data/territoryGraph"
+import { adjacencyMap, flagByTerritoryId } from "../../data/territoryGraph"
 
 function WorldMap() {
   const {
@@ -144,16 +143,16 @@ function WorldMap() {
       viewBox="0 0 1350 900"
       width="1100"
       height="750"
-      className="rounded-xl bg-blue-800 mx-auto mb-2 relative"
+      className="rounded-xl bg-blue-800 mx-auto mb-2"
     >
-      {/* Overlay image behind board */}
+      {/* Overlay image must be rendered first so it's behind everything */}
       <image
         href="/world-overlay.png"
         x="0"
         y="0"
         width="1350"
         height="900"
-        opacity=".6"
+	style={{ opacity: 0.5 }}
         preserveAspectRatio="xMidYMid slice"
       />
 
@@ -192,16 +191,18 @@ function WorldMap() {
         if (!pos) return null
         const fillClass = getOwnerColor(t.owner)
         const troopCount = t.troops || 0
+        const flag = flagByTerritoryId[t.id]
+
         let highlight = ""
         if (selectedSource === t.id) {
-          highlight = "stroke-yellow-400 stroke-4"
+          highlight = "stroke-yellow-300 stroke-[8] drop-shadow-lg"
         } else if (
           selectedSource &&
           adjacencyMap[selectedSource]?.includes(t.id) &&
           t.owner &&
           t.owner !== currentPlayer.id
         ) {
-          highlight = "stroke-red-400 stroke-2"
+          highlight = "stroke-red-500 stroke-[6] drop-shadow-md"
         }
 
         return (
@@ -214,9 +215,21 @@ function WorldMap() {
               rx="10"
               className={`${fillClass} stroke-white stroke-2 ${highlight}`}
             />
+            {flag && (
+              <text
+                x={pos.x + 60}
+                y={pos.y + 25}
+                textAnchor="middle"
+                fontSize="20"
+                dominantBaseline="middle"
+                pointerEvents="none"
+              >
+                {flag}
+              </text>
+            )}
             <text
               x={pos.x + 60}
-              y={pos.y + 30}
+              y={pos.y + 50}
               textAnchor="middle"
               fill="white"
               fontSize="14"
@@ -228,7 +241,7 @@ function WorldMap() {
             </text>
             <text
               x={pos.x + 60}
-              y={pos.y + 55}
+              y={pos.y + 75}
               textAnchor="middle"
               fill="white"
               fontSize="16"
