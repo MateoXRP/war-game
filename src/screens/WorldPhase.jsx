@@ -1,5 +1,6 @@
 // src/screens/WorldPhase.jsx
 import { useGame } from "../context/GameContext"
+import { useLog } from "../context/LogContext"
 import WorldMap from "../components/map/WorldMap"
 
 function WorldPhase() {
@@ -9,8 +10,9 @@ function WorldPhase() {
     isReinforcementPhase,
     territories,
     reinforcements,
-    actionLog,
   } = useGame()
+
+  const { actionLog } = useLog()
 
   let troopsRemaining = null
 

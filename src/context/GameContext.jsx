@@ -9,6 +9,7 @@ import {
   handleTurnStartTroops,
 } from "../logic/phaseLogic"
 import { useSelection } from "../hooks/useSelection"
+import { useLog } from "./LogContext"
 
 const GameContext = createContext()
 
@@ -35,12 +36,7 @@ export function GameProvider({ children }) {
     resetSelection,
   } = useSelection()
 
-  const [actionLog, setActionLog] = useState([])
-
-  function logAction(message) {
-    setActionLog((prev) => [...prev.slice(-49), message])
-  }
-
+  const { logAction } = useLog()
   const playerOrderRef = useRef(null)
 
   const currentPlayer = playerOrder ? playerOrder[turnIndex % playerOrder.length] : null
@@ -179,7 +175,6 @@ export function GameProvider({ children }) {
         selectedTarget,
         setSelectedTarget,
         resolveBattle,
-        actionLog,
         logAction,
       }}
     >
