@@ -48,8 +48,27 @@ export function GameProvider({ children }) {
   const currentPlayer = playerOrder ? playerOrder[turnIndex % playerOrder.length] : null
 
   const nextTurn = () => {
-    setTurnIndex((prev) => prev + 1)
-    resetSelection()
+    if (!playerOrder || territories.length === 0) return
+
+    let nextIndex = turnIndex + 1
+    let safety = 0
+
+    while (safety < 10) {
+      const nextPlayer = playerOrder[nextIndex % playerOrder.length]
+      const ownsTiles =
+        isPlacementPhase || territories.some(t => t.owner === nextPlayer.id)
+
+      if (ownsTiles) {
+        setTurnIndex(nextIndex)
+        resetSelection()
+        return
+      }
+
+      nextIndex++
+      safety++
+    }
+
+    console.warn("No valid players found for next turn.")
   }
 
   async function recordGameResult(outcome) {
@@ -91,7 +110,6 @@ export function GameProvider({ children }) {
     }
   }, [])
 
-  // This effect now runs always to detect phase changes properly
   useEffect(() => {
     handlePlacementToReinforcement({
       territories,
