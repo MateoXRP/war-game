@@ -6,8 +6,8 @@ import {
 } from "../data/territoryGraph"
 
 const cpuMemory = {
-  cpu1: { continent: null, reinforceIndex: 0, remainingTurnTroops: null, turnActive: false },
-  cpu2: { continent: null, reinforceIndex: 0, remainingTurnTroops: null, turnActive: false },
+  cpu1: { continent: null, reinforceIndex: 0, turnActive: false },
+  cpu2: { continent: null, reinforceIndex: 0, turnActive: false },
 }
 
 function isAdjacentToEnemy(id, allTerritories, cpuId) {
@@ -30,11 +30,21 @@ export function handleCpuTurn({
   setReinforcements,
   resolveBattle,
 }) {
+  // ✅ Elimination check (skip only AFTER placement phase)
+  if (!isPlacementPhase) {
+    const isEliminated = !territories.some(t => t.owner === currentPlayer.id)
+    if (isEliminated) {
+      console.log(`💀 ${currentPlayer.name} has been eliminated. Skipping turn.`)
+      nextTurn()
+      return
+    }
+  }
+
   if (isPlacementPhase) return handleClaimPhase()
   if (isReinforcementPhase && reinforcements[currentPlayer.id] > 0) {
     return handleReinforcementLoop()
   }
-  if (isTurnPhase && reinforcements[currentPlayer.id] > 0) {
+  if (isTurnPhase) {
     return handleTurnPhaseLoop()
   }
 
@@ -127,44 +137,97 @@ export function handleCpuTurn({
     if (memory.turnActive) return
     memory.turnActive = true
 
-    const performAttacks = () => {
-      const owned = territories.filter(t => t.owner === currentPlayer.id && t.troops > 1)
+    if (reinforcements[currentPlayer.id] > 0) {
+      let remaining = reinforcements[currentPlayer.id]
 
-      const attackPairs = []
-      for (const from of owned) {
-        const neighbors = adjacencyMap[from.id] || []
-        const enemies = neighbors
-          .map(id => territories.find(t => t.id === id))
-          .filter(t => t && t.owner !== currentPlayer.id)
-        if (enemies.length > 0) {
-          const weakest = enemies.reduce((a, b) => (a.troops < b.troops ? a : b))
-          attackPairs.push({ from: from.id, to: weakest.id })
+      const interval = setInterval(() => {
+        if (remaining <= 0) {
+          clearInterval(interval)
+          performAttack()
+        } else {
+          placeTurnTroop()
+          remaining -= 1
         }
-      }
-
-      if (attackPairs.length === 0) {
-        memory.turnActive = false
-        nextTurn()
-        return
-      }
-
-      const { from, to } = attackPairs[0]
-      const fromTerritory = territories.find(t => t.id === from)
-      const toTerritory = territories.find(t => t.id === to)
-
-      console.log(
-        `🪖 ${currentPlayer.name} attacks from ${fromTerritory.name} (${fromTerritory.troops}) → ${toTerritory.name} (${toTerritory.troops} owned by ${toTerritory.owner})`
-      )
-
-      resolveBattle(from, to)
-
-      setTimeout(() => {
-        memory.turnActive = false
-        nextTurn()
-      }, 350)
+      }, 250)
+      return
     }
 
-    performAttacks()
+    performAttack()
+  }
+
+  function placeTurnTroop() {
+    const memory = cpuMemory[currentPlayer.id]
+
+    const owned = territories.filter((t) => t.owner === currentPlayer.id)
+    const frontline = owned.filter((t) =>
+      isAdjacentToEnemy(t.id, territories, currentPlayer.id)
+    )
+
+    let targets = frontline
+
+    if (targets.length === 0) {
+      const preferredContinent = memory.continent
+      const inContinent = owned.filter((t) => t.continent === preferredContinent)
+      const connectorIds = entryPointsByContinent[preferredContinent] || []
+      targets = inContinent.filter((t) => connectorIds.includes(t.id))
+    }
+
+    if (targets.length === 0) {
+      targets = owned
+    }
+
+    const index = memory.reinforceIndex % targets.length
+    const target = targets[index]
+    memory.reinforceIndex++
+
+    setTerritories((prev) =>
+      prev.map((t) =>
+        t.id === target.id ? { ...t, troops: t.troops + 1 } : t
+      )
+    )
+
+    setReinforcements((prev) => ({
+      ...prev,
+      [currentPlayer.id]: prev[currentPlayer.id] - 1,
+    }))
+  }
+
+  function performAttack() {
+    const memory = cpuMemory[currentPlayer.id]
+    const owned = territories.filter(t => t.owner === currentPlayer.id && t.troops > 1)
+
+    const attackPairs = []
+    for (const from of owned) {
+      const neighbors = adjacencyMap[from.id] || []
+      const enemies = neighbors
+        .map(id => territories.find(t => t.id === id))
+        .filter(t => t && t.owner !== currentPlayer.id)
+      if (enemies.length > 0) {
+        const weakest = enemies.reduce((a, b) => (a.troops < b.troops ? a : b))
+        attackPairs.push({ from: from.id, to: weakest.id })
+      }
+    }
+
+    if (attackPairs.length === 0) {
+      memory.turnActive = false
+      nextTurn()
+      return
+    }
+
+    const { from, to } = attackPairs[0]
+    const fromTerritory = territories.find(t => t.id === from)
+    const toTerritory = territories.find(t => t.id === to)
+
+    console.log(
+      `🪖 ${currentPlayer.name} attacks from ${fromTerritory.name} (${fromTerritory.troops}) → ${toTerritory.name} (${toTerritory.troops} owned by ${toTerritory.owner})`
+    )
+
+    resolveBattle(from, to)
+
+    setTimeout(() => {
+      memory.turnActive = false
+      nextTurn()
+    }, 350)
   }
 
   function claim(territory) {
