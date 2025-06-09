@@ -23,6 +23,12 @@ export function GameProvider({ children }) {
   const [selectedSource, setSelectedSource] = useState(null)
   const [selectedTarget, setSelectedTarget] = useState(null)
 
+  const [actionLog, setActionLog] = useState([])
+
+  function logAction(message) {
+    setActionLog((prev) => [...prev.slice(-49), message])
+  }
+
   const playerOrderRef = useRef(null)
 
   const currentPlayer = playerOrder ? playerOrder[turnIndex % playerOrder.length] : null
@@ -137,7 +143,7 @@ export function GameProvider({ children }) {
           isTurnPhase,
           reinforcements,
           setReinforcements,
-          resolveBattle, // ✅ FIX: Pass this so CPU can attack
+          resolveBattle,
         })
       }, 300)
     }
@@ -197,6 +203,8 @@ export function GameProvider({ children }) {
 
     setSelectedSource(null)
     setSelectedTarget(null)
+
+    logAction(`⚔️ ${currentPlayer.name} attacked from ${attacker.name} → ${defender.name}. Losses: A${attackerLosses}/D${defenderLosses}`)
   }
 
   return (
@@ -217,6 +225,8 @@ export function GameProvider({ children }) {
         selectedTarget,
         setSelectedTarget,
         resolveBattle,
+        actionLog,
+        logAction,
       }}
     >
       {children}
@@ -225,3 +235,4 @@ export function GameProvider({ children }) {
 }
 
 export const useGame = () => useContext(GameContext)
+
