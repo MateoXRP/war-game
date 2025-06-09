@@ -1,18 +1,64 @@
 // src/screens/WorldPhase.jsx
 import { useGame } from "../context/GameContext"
-import { useLog } from "../context/LogContext"
 import WorldMap from "../components/map/WorldMap"
+import { useLog } from "../context/LogContext"
 
 function WorldPhase() {
   const {
     currentPlayer,
     isPlacementPhase,
     isReinforcementPhase,
+    isTurnPhase,
     territories,
+    setTerritories,
     reinforcements,
+    setReinforcements,
+    nextTurn,
+    gameOver,
+    winner,
   } = useGame()
 
   const { actionLog } = useLog()
+
+  if (gameOver) {
+    const isVictory = winner?.id === "human"
+
+    const handleRestart = () => {
+      window.location.reload()
+    }
+
+    const handleSignOut = () => {
+      localStorage.removeItem("playerName")
+      window.location.reload()
+    }
+
+    return (
+      <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center space-y-6">
+        <h1 className="text-4xl font-bold">
+          {isVictory ? "🎉 You Win!" : "💀 Game Over"}
+        </h1>
+        <p className="text-lg text-gray-300">
+          {isVictory
+            ? "You conquered the world!"
+            : `You were eliminated by ${winner?.name}.`}
+        </p>
+        <div className="flex space-x-4">
+          <button
+            onClick={handleRestart}
+            className="bg-yellow-500 text-black font-semibold py-2 px-6 rounded-2xl shadow hover:bg-yellow-400"
+          >
+            🔁 Restart
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-red-500"
+          >
+            🚪 Sign Out
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   let troopsRemaining = null
 
@@ -55,6 +101,25 @@ function WorldPhase() {
           ))}
         </div>
       </div>
+
+      {/* Surrender Button (after log) */}
+      {isTurnPhase && currentPlayer?.id === "human" && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => {
+              const cleared = territories.map((t) =>
+                t.owner === "human" ? { ...t, owner: null, troops: 0 } : t
+              )
+              setTerritories(cleared)
+              setReinforcements((prev) => ({ ...prev, human: 0 }))
+              nextTurn()
+            }}
+            className="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
+          >
+            🏳️ Surrender
+          </button>
+        </div>
+      )}
     </div>
   )
 }

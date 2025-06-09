@@ -28,6 +28,9 @@ export function GameProvider({ children }) {
   const [troopsAwardedTurn, setTroopsAwardedTurn] = useState(-1)
   const [lastCpuPlacementTurn, setLastCpuPlacementTurn] = useState(null)
 
+  const [gameOver, setGameOver] = useState(false)
+  const [winner, setWinner] = useState(null)
+
   const {
     selectedSource,
     setSelectedSource,
@@ -46,7 +49,6 @@ export function GameProvider({ children }) {
     resetSelection()
   }
 
-  // Initial setup: roll dice and assign reinforcements
   useEffect(() => {
     if (!playerOrderRef.current) {
       const rolls = basePlayers.map(p => ({ ...p, roll: rollDie() }))
@@ -62,7 +64,6 @@ export function GameProvider({ children }) {
     }
   }, [])
 
-  // Placement → Reinforcement
   useEffect(() => {
     handlePlacementToReinforcement({
       territories,
@@ -74,7 +75,6 @@ export function GameProvider({ children }) {
     })
   }, [territories, isPlacementPhase])
 
-  // Reinforcement → Turn
   useEffect(() => {
     handleReinforcementToTurn({
       reinforcements,
@@ -84,7 +84,6 @@ export function GameProvider({ children }) {
     })
   }, [reinforcements, isReinforcementPhase])
 
-  // Start of Turn → Award bonus troops
   useEffect(() => {
     handleTurnStartTroops({
       isTurnPhase,
@@ -97,7 +96,6 @@ export function GameProvider({ children }) {
     })
   }, [isTurnPhase, currentPlayer, territories, turnIndex, troopsAwardedTurn])
 
-  // CPU Turn Handling
   useEffect(() => {
     const isCpu = currentPlayer?.isCPU
     if (!isCpu) return
@@ -142,6 +140,32 @@ export function GameProvider({ children }) {
     lastCpuPlacementTurn,
   ])
 
+  useEffect(() => {
+    if (
+      !isTurnPhase ||
+      !playerOrderRef.current ||
+      playerOrderRef.current.length === 0
+    ) return
+
+    const activePlayers = playerOrderRef.current.filter((p) =>
+      territories.some((t) => t.owner === p.id)
+    )
+
+    if (!gameOver) {
+      if (activePlayers.length === 1) {
+        setGameOver(true)
+        setWinner(activePlayers[0])
+      } else {
+        const humanAlive = territories.some((t) => t.owner === "human")
+        if (!humanAlive) {
+          const survivingCPU = activePlayers.find((p) => p.id !== "human")
+          setGameOver(true)
+          setWinner(survivingCPU || null)
+        }
+      }
+    }
+  }, [territories, gameOver, isTurnPhase])
+
   function resolveBattle(attackerId, defenderId) {
     battleLogic({
       attackerId,
@@ -176,6 +200,8 @@ export function GameProvider({ children }) {
         setSelectedTarget,
         resolveBattle,
         logAction,
+        gameOver,
+        winner,
       }}
     >
       {children}
