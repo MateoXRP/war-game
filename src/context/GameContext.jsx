@@ -1,8 +1,8 @@
 // src/context/GameContext.jsx
 import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { initialTerritories, players as basePlayers } from "../data/gameData"
-import { handleCpuTurn } from "../logic/cpuLogic"
 import { resolveBattle as battleLogic } from "../logic/battleLogic"
+import { handleCpuTurn } from "../logic/cpuLogic"
 import {
   handlePlacementToReinforcement,
   handleReinforcementToTurn,
@@ -10,6 +10,9 @@ import {
 } from "../logic/phaseLogic"
 import { useSelection } from "../hooks/useSelection"
 import { useLog } from "./LogContext"
+
+import { db } from "../firebase"
+import { doc, setDoc, updateDoc, getDoc, increment } from "firebase/firestore"
 
 const GameContext = createContext()
 
@@ -49,9 +52,28 @@ export function GameProvider({ children }) {
     resetSelection()
   }
 
+  async function recordGameResult(outcome) {
+    const playerName = localStorage.getItem("playerName")
+    if (!playerName) return
+
+    const statsRef = doc(db, "players", playerName, "stats", "global")
+
+    try {
+      const snap = await getDoc(statsRef)
+      if (!snap.exists()) {
+        await setDoc(statsRef, { wins: 0, losses: 0 })
+      }
+      await updateDoc(statsRef, {
+        [outcome === "win" ? "wins" : "losses"]: increment(1),
+      })
+    } catch (err) {
+      console.error("Failed to record game result:", err)
+    }
+  }
+
   useEffect(() => {
     if (!playerOrderRef.current) {
-      const rolls = basePlayers.map(p => ({ ...p, roll: rollDie() }))
+      const rolls = basePlayers.map((p) => ({ ...p, roll: rollDie() }))
       rolls.sort((a, b) => b.roll - a.roll)
       playerOrderRef.current = rolls
       setPlayerOrder(rolls)
@@ -145,7 +167,8 @@ export function GameProvider({ children }) {
       !isTurnPhase ||
       !playerOrderRef.current ||
       playerOrderRef.current.length === 0
-    ) return
+    )
+      return
 
     const activePlayers = playerOrderRef.current.filter((p) =>
       territories.some((t) => t.owner === p.id)
@@ -155,12 +178,18 @@ export function GameProvider({ children }) {
       if (activePlayers.length === 1) {
         setGameOver(true)
         setWinner(activePlayers[0])
+        if (activePlayers[0].id === "human") {
+          recordGameResult("win")
+        } else {
+          recordGameResult("loss")
+        }
       } else {
         const humanAlive = territories.some((t) => t.owner === "human")
         if (!humanAlive) {
           const survivingCPU = activePlayers.find((p) => p.id !== "human")
           setGameOver(true)
           setWinner(survivingCPU || null)
+          recordGameResult("loss")
         }
       }
     }

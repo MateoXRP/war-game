@@ -2,6 +2,7 @@
 import { useGame } from "../context/GameContext"
 import WorldMap from "../components/map/WorldMap"
 import { useLog } from "../context/LogContext"
+import { useEffect, useRef } from "react"
 
 function WorldPhase() {
   const {
@@ -19,9 +20,17 @@ function WorldPhase() {
   } = useGame()
 
   const { actionLog } = useLog()
+  const hasTurnStarted = useRef(false)
+
+  useEffect(() => {
+    if (isTurnPhase) {
+      hasTurnStarted.current = true
+    }
+  }, [isTurnPhase])
 
   if (gameOver) {
     const isVictory = winner?.id === "human"
+    const playerName = localStorage.getItem("playerName")
 
     const handleRestart = () => {
       window.location.reload()
@@ -35,7 +44,7 @@ function WorldPhase() {
     return (
       <div className="min-h-screen bg-background text-white flex flex-col items-center justify-center space-y-6">
         <h1 className="text-4xl font-bold">
-          {isVictory ? "🎉 You Win!" : "💀 Game Over"}
+          {isVictory ? `🎉 ${playerName} Wins!` : "💀 Game Over"}
         </h1>
         <p className="text-lg text-gray-300">
           {isVictory
@@ -60,66 +69,59 @@ function WorldPhase() {
     )
   }
 
-  let troopsRemaining = null
-
-  if (isPlacementPhase) {
-    const claimed = territories.filter((t) => t.owner === currentPlayer.id).length
-    troopsRemaining = 35 - claimed
-  } else if (isReinforcementPhase) {
-    troopsRemaining = reinforcements[currentPlayer.id]
+  const handleSurrender = () => {
+    const cleared = territories.map((t) =>
+      t.owner === "human" ? { ...t, owner: null, troops: 0 } : t
+    )
+    setTerritories(cleared)
+    setReinforcements((prev) => ({ ...prev, human: 0 }))
+    nextTurn()
   }
 
   return (
-    <div className="bg-background text-white min-h-screen flex flex-col items-center justify-center py-6 px-4 space-y-4">
-      <h2 className="text-2xl font-bold mb-1">World Map</h2>
-
-      <p className="text-sm text-gray-400 mb-2">
-        Current Turn: <span className="text-white font-semibold">{currentPlayer.name}</span>
-      </p>
-
-      {troopsRemaining !== null && (
-        <p className="text-sm text-gray-300">
-          Troops Remaining: <span className="text-white font-semibold">{troopsRemaining}</span>
-        </p>
-      )}
-
-      <div className="flex justify-center items-center w-full">
-        <WorldMap />
+    <div className="flex flex-col min-h-screen bg-background text-white">
+      <div className="flex justify-between items-center px-6 py-4 bg-gray-800 shadow">
+        <div className="text-lg font-semibold">
+          {isPlacementPhase
+            ? "📦 Placement Phase"
+            : isReinforcementPhase
+            ? "➕ Reinforcement Phase"
+            : "⚔️ Turn Phase"}
+        </div>
+        <div className="text-sm text-gray-300">
+          Current Turn: {currentPlayer?.name || "Loading..."}
+        </div>
+        <div className="text-sm text-gray-300">
+          Troops Remaining: {reinforcements[currentPlayer?.id] ?? 0}
+        </div>
       </div>
 
-      {/* Log Panel */}
-      <div className="bg-gray-900 w-full max-w-4xl mt-6 p-4 rounded-lg shadow-lg">
-        <h3 className="text-lg font-semibold mb-2 text-yellow-400">📜 Battle Log</h3>
-        <div className="h-40 overflow-y-auto text-sm space-y-1 pr-2">
-          {actionLog.length === 0 && (
-            <div className="text-gray-500 italic">No actions yet...</div>
-          )}
-          {[...actionLog].reverse().map((entry, index) => (
-            <div key={index} className="text-white">
-              {entry}
+      <div className="flex flex-1">
+        <div className="w-3/4">
+          <WorldMap />
+        </div>
+        <div className="w-1/4 bg-gray-900 p-4 border-l border-gray-700 flex flex-col justify-between">
+          <div className="flex-1 overflow-y-auto space-y-1">
+            <h2 className="text-lg font-semibold mb-2">📜 Battle Log</h2>
+            {actionLog.map((entry, index) => (
+              <div key={index} className="text-sm text-gray-300">
+                {entry}
+              </div>
+            ))}
+          </div>
+
+          {isTurnPhase && currentPlayer?.id === "human" && hasTurnStarted.current && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={handleSurrender}
+                className="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
+              >
+                🏳️ Surrender
+              </button>
             </div>
-          ))}
+          )}
         </div>
       </div>
-
-      {/* Surrender Button (after log) */}
-      {isTurnPhase && currentPlayer?.id === "human" && (
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              const cleared = territories.map((t) =>
-                t.owner === "human" ? { ...t, owner: null, troops: 0 } : t
-              )
-              setTerritories(cleared)
-              setReinforcements((prev) => ({ ...prev, human: 0 }))
-              nextTurn()
-            }}
-            className="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
-          >
-            🏳️ Surrender
-          </button>
-        </div>
-      )}
     </div>
   )
 }
