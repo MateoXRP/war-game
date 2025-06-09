@@ -77,14 +77,22 @@ export function handleTurnPhaseLoop({
     )
 
     const attackQueue = []
+
     for (const from of owned) {
       const neighbors = adjacencyMap[from.id] || []
+
       const enemies = neighbors
         .map((id) => territories.find((t) => t.id === id))
-        .filter((t) => t && t.owner !== currentPlayer.id)
+        .filter((t) =>
+          t &&
+          t.owner &&
+          t.owner !== currentPlayer.id &&
+          from.troops > t.troops // Avoid suicide attacks
+        )
+        .sort((a, b) => a.troops - b.troops) // Prioritize weak targets
 
       if (enemies.length > 0) {
-        const weakest = enemies.reduce((a, b) => (a.troops < b.troops ? a : b))
+        const weakest = enemies[0]
         attackQueue.push({ from: from.id, to: weakest.id })
       }
     }
@@ -96,7 +104,6 @@ export function handleTurnPhaseLoop({
       return
     }
 
-    // Cap to max 3 attacks per turn
     const maxAttacks = 3
     const attacksToPerform = attackQueue.slice(0, maxAttacks)
 
