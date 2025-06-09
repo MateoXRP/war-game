@@ -22,7 +22,7 @@ export function handleTurnPhaseLoop({
     const interval = setInterval(() => {
       if (remaining <= 0) {
         clearInterval(interval)
-        startAttacks()
+        startAttackLoop()
       } else {
         placeTurnTroop()
         remaining -= 1
@@ -32,7 +32,7 @@ export function handleTurnPhaseLoop({
     return
   }
 
-  startAttacks()
+  startAttackLoop()
 
   function placeTurnTroop() {
     const owned = territories.filter((t) => t.owner === currentPlayer.id)
@@ -71,12 +71,28 @@ export function handleTurnPhaseLoop({
     }))
   }
 
-  function startAttacks() {
+  function startAttackLoop() {
+    const runNextRound = () => {
+      const attacks = getBestAttackSet()
+      if (attacks.length === 0) {
+        memory.turnActive = false
+        nextTurn()
+        return
+      }
+
+      executeAttackSet(attacks, () => {
+        setTimeout(runNextRound, 400)
+      })
+    }
+
+    runNextRound()
+  }
+
+  function getBestAttackSet() {
     const owned = territories.filter(
       (t) => t.owner === currentPlayer.id && t.troops > 1
     )
 
-    // 🧠 Identify priority continents (≥6/9 owned)
     const continentOwnership = {}
     for (const t of territories) {
       if (!continentOwnership[t.continent]) {
@@ -94,7 +110,6 @@ export function handleTurnPhaseLoop({
         .map(([name]) => name)
     )
 
-    // 🧠 Build all possible valid attacks with priority scores
     const allAttacks = []
 
     for (const from of owned) {
@@ -106,56 +121,44 @@ export function handleTurnPhaseLoop({
           !to ||
           !to.owner ||
           to.owner === currentPlayer.id ||
-          from.troops <= to.troops // skip suicide attacks
+          from.troops <= to.troops
         ) {
           continue
         }
 
         let score = 0
-
-        if (priorityContinents.has(to.continent)) {
-          score += 10
-        }
-
-        if (from.troops > to.troops) {
-          score += 5
-        }
-
+        if (priorityContinents.has(to.continent)) score += 10
+        if (from.troops > to.troops) score += 5
         score += Math.max(0, 5 - to.troops)
 
         allAttacks.push({ from: from.id, to: to.id, score })
       }
     }
 
-    if (allAttacks.length === 0) {
-      console.log(`⚠️ ${currentPlayer.name} has no valid attacks.`)
-      memory.turnActive = false
-      nextTurn()
-      return
-    }
-
     allAttacks.sort((a, b) => b.score - a.score)
 
-    const maxAttacks = 3
-    const attacksToPerform = []
     const usedTargets = new Set()
+    const attacksToPerform = []
 
     for (const attack of allAttacks) {
       if (!usedTargets.has(attack.to)) {
         attacksToPerform.push(attack)
         usedTargets.add(attack.to)
       }
-      if (attacksToPerform.length >= maxAttacks) break
+      if (attacksToPerform.length >= 3) break
     }
 
-    function performNextAttack(index = 0) {
-      if (index >= attacksToPerform.length) {
-        memory.turnActive = false
-        nextTurn()
+    return attacksToPerform
+  }
+
+  function executeAttackSet(attacks, onComplete) {
+    function perform(index = 0) {
+      if (index >= attacks.length) {
+        onComplete()
         return
       }
 
-      const { from, to } = attacksToPerform[index]
+      const { from, to } = attacks[index]
       const fromTerritory = territories.find((t) => t.id === from)
       const toTerritory = territories.find((t) => t.id === to)
 
@@ -165,10 +168,10 @@ export function handleTurnPhaseLoop({
 
       resolveBattle(from, to)
 
-      setTimeout(() => performNextAttack(index + 1), 350)
+      setTimeout(() => perform(index + 1), 350)
     }
 
-    performNextAttack()
+    perform()
   }
 }
 
