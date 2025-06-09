@@ -25,6 +25,7 @@ export function GameProvider({ children }) {
 
   const [actionLog, setActionLog] = useState([])
 
+  // ✅ Duplicate safeguard removed — every message gets logged
   function logAction(message) {
     setActionLog((prev) => [...prev.slice(-49), message])
   }
@@ -173,7 +174,6 @@ export function GameProvider({ children }) {
 
     let attackerLosses = 0
     let defenderLosses = 0
-    let hasLogged = false
 
     for (let i = 0; i < Math.min(attackRolls.length, defenseRolls.length); i++) {
       if (attackRolls[i] > defenseRolls[i]) {
@@ -183,34 +183,40 @@ export function GameProvider({ children }) {
       }
     }
 
+    const defenderRemaining = defender.troops - defenderLosses
+    const conquered = defenderRemaining <= 0
+
     setTerritories((prev) =>
       prev.map((t) => {
         if (t.id === attacker.id) {
           return { ...t, troops: t.troops - attackerLosses }
         }
         if (t.id === defender.id) {
-          const remainingTroops = t.troops - defenderLosses
-          if (remainingTroops <= 0) {
-            if (!hasLogged) {
-              logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
-              hasLogged = true
-            }
-            return {
-              ...t,
-              owner: attacker.owner,
-              troops: attackerDice - attackerLosses,
-            }
-          }
-          return { ...t, troops: remainingTroops }
+          return conquered
+            ? {
+                ...t,
+                owner: attacker.owner,
+                troops: attackerDice - attackerLosses,
+              }
+            : { ...t, troops: defenderRemaining }
         }
         return t
       })
     )
 
+    const defenderPlayer = playerOrder?.find((p) => p.id === defender.owner)
+    const defenderName = defenderPlayer?.name || `Player ${defender.owner}`
+
+    // ✅ Conquest appears above the attack (newest on top in UI)
+    logAction(
+      `⚔️ ${currentPlayer.name} attacked ${defenderName} on ${defender.name} from ${attacker.name}. Losses: A${attackerLosses}/D${defenderLosses}`
+    )
+    if (conquered) {
+      logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
+    }
+
     setSelectedSource(null)
     setSelectedTarget(null)
-
-    logAction(`⚔️ ${currentPlayer.name} attacked from ${attacker.name} → ${defender.name}. Losses: A${attackerLosses}/D${defenderLosses}`)
   }
 
   return (

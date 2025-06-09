@@ -11,6 +11,7 @@ export function handleTurnPhaseLoop({
   setReinforcements,
   resolveBattle,
   memory,
+  logAction,
 }) {
   if (memory.turnActive) return
   memory.turnActive = true
@@ -62,6 +63,8 @@ export function handleTurnPhaseLoop({
       )
     )
 
+    logAction?.(`➕ ${currentPlayer.name} reinforced ${target.name}`)
+
     setReinforcements((prev) => ({
       ...prev,
       [currentPlayer.id]: prev[currentPlayer.id] - 1,
@@ -88,7 +91,7 @@ export function handleTurnPhaseLoop({
 
     if (attackPairs.length === 0) {
       console.log(`⚠️ ${currentPlayer.name} has no valid attacks.`)
-      memory.turnActive = false // ✅ fix: always reset
+      memory.turnActive = false
       nextTurn()
       return
     }
@@ -104,7 +107,7 @@ export function handleTurnPhaseLoop({
     resolveBattle(from, to)
 
     setTimeout(() => {
-      memory.turnActive = false // ✅ fix: always reset here too
+      memory.turnActive = false
       nextTurn()
     }, 350)
   }

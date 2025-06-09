@@ -28,7 +28,7 @@ export function handleCpuTurn({
   if (!isPlacementPhase && isPlayerEliminated(territories, currentPlayer.id)) {
     console.log(`💀 ${currentPlayer.name} has been eliminated. Skipping turn.`)
     if (memory) {
-      memory.turnActive = false
+      memory.turnActive = false // ✅ reset flag so CPU doesn't get stuck
     }
     nextTurn()
     return
@@ -68,6 +68,7 @@ export function handleCpuTurn({
       setReinforcements,
       resolveBattle,
       memory,
+      logAction, // ✅ pass to enable turn-phase reinforcement logging
     })
   }
 }
