@@ -37,7 +37,7 @@ function WorldMap() {
 
       setReinforcements((prev) => ({
         ...prev,
-        [currentPlayer.id]: prev[currentPlayer.id] - 1,
+        [currentPlayer.id]: (prev[currentPlayer.id] || 35) - 1,
       }))
 
       nextTurn()
@@ -221,13 +221,28 @@ function WorldMap() {
             />
             <text
               x={pos.x + 60}
-              y={pos.y + 60}
+              y={pos.y + 30}
               textAnchor="middle"
               fill="white"
-              fontSize="12"
-              fontWeight="bold"
+              fontSize="14"
+              fontWeight="600"
+              dominantBaseline="middle"
+              pointerEvents="none"
             >
-              {t.name} ({troopCount})
+              {t.name}
+            </text>
+            <text
+              x={pos.x + 60}
+              y={pos.y + 55}
+              textAnchor="middle"
+              fill="white"
+              fontSize="16"
+              fontWeight="bold"
+              dominantBaseline="middle"
+              pointerEvents="none"
+              className="drop-shadow-md"
+            >
+              {troopCount}
             </text>
           </g>
         )
