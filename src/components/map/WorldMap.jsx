@@ -24,19 +24,25 @@ function WorldMap() {
     const target = state.find((t) => t.id === id)
     if (!target) return
 
-    // Phase 1: Claiming
     if (isPlacementPhase) {
       if (target.owner) return
+
       setTerritories((prev) =>
         prev.map((t) =>
           t.id === id ? { ...t, owner: currentPlayer.id, troops: 1 } : t
         )
       )
+
       logAction(`🏴 ${currentPlayer.name} claimed ${target.name}`)
+
+      setReinforcements((prev) => ({
+        ...prev,
+        [currentPlayer.id]: prev[currentPlayer.id] - 1,
+      }))
+
       nextTurn()
     }
 
-    // Phase 2: Reinforcement
     else if (isReinforcementPhase) {
       if (target.owner !== currentPlayer.id) return
       if (reinforcements[currentPlayer.id] <= 0) return
@@ -59,9 +65,7 @@ function WorldMap() {
       })
     }
 
-    // Phase 3: Turn Phase — troop placement or attack
     else if (isTurnPhase) {
-      // Troop placement
       if (target.owner === currentPlayer.id && reinforcements[currentPlayer.id] > 0) {
         setTerritories((prev) =>
           prev.map((t) =>
@@ -77,7 +81,6 @@ function WorldMap() {
         return
       }
 
-      // Attack selection
       if (!selectedSource) {
         if (target.owner === currentPlayer.id && target.troops > 1) {
           setSelectedSource(target.id)
@@ -95,7 +98,6 @@ function WorldMap() {
           setSelectedTarget(target.id)
           resolveBattle(selectedSource, target.id)
         } else if (target.id === selectedSource) {
-          // Cancel selection if clicked again
           setSelectedSource(null)
         }
       }
@@ -149,139 +151,117 @@ function WorldMap() {
     ["af5", "au5"],
   ]
 
-  const showEndTurn =
-    isTurnPhase &&
-    currentPlayer?.id === "human" &&
-    reinforcements[currentPlayer.id] === 0
-
   return (
-    <div className="flex flex-col items-center space-y-2">
-      {isTurnPhase && currentPlayer?.id === "human" && (
-        <div className="text-white font-bold text-lg">
-          💂 Troops remaining: {reinforcements[currentPlayer.id] || 0}
-        </div>
-      )}
+    <svg
+      viewBox="0 0 1350 900"
+      width="1100"
+      height="750"
+      className="rounded-xl bg-blue-800 mx-auto mb-2"
+    >
+      {centerLines.map(([from, to], index) => {
+        const a = positions[from]
+        const b = positions[to]
+        if (!a || !b) return null
 
-      {showEndTurn && (
-        <button
-          onClick={nextTurn}
-          className="bg-yellow-500 text-black font-bold px-4 py-2 rounded-lg shadow-lg"
-        >
-          End Turn
-        </button>
-      )}
+        const midX = (a.x + b.x) / 2 + 60
+        const midY = (a.y + b.y) / 2 + 50
 
-      <svg
-        viewBox="0 0 1350 900"
-        width="1100"
-        height="750"
-        className="rounded-xl bg-blue-800 mx-auto mb-2"
-      >
-        {centerLines.map(([from, to], index) => {
-          const a = positions[from]
-          const b = positions[to]
-          if (!a || !b) return null
+        return (
+          <>
+            <line
+              key={`${index}-a`}
+              x1={(a.x + 60 + midX) / 2}
+              y1={(a.y + 50 + midY) / 2}
+              x2={midX}
+              y2={midY}
+              stroke="yellow"
+              strokeWidth="3"
+            />
+            <line
+              key={`${index}-b`}
+              x1={(b.x + 60 + midX) / 2}
+              y1={(b.y + 50 + midY) / 2}
+              x2={midX}
+              y2={midY}
+              stroke="yellow"
+              strokeWidth="3"
+            />
+          </>
+        )
+      })}
 
-          const midX = (a.x + b.x) / 2 + 60
-          const midY = (a.y + b.y) / 2 + 50
+      {state.map((t) => {
+        const pos = positions[t.id]
+        if (!pos) return null
 
-          return (
-            <>
-              <line
-                key={`${index}-a`}
-                x1={(a.x + 60 + midX) / 2}
-                y1={(a.y + 50 + midY) / 2}
-                x2={midX}
-                y2={midY}
-                stroke="yellow"
-                strokeWidth="3"
-              />
-              <line
-                key={`${index}-b`}
-                x1={(b.x + 60 + midX) / 2}
-                y1={(b.y + 50 + midY) / 2}
-                x2={midX}
-                y2={midY}
-                stroke="yellow"
-                strokeWidth="3"
-              />
-            </>
-          )
-        })}
+        const fillClass = getOwnerColor(t.owner)
+        const troopCount = t.troops || 0
 
-        {state.map((t) => {
-          const pos = positions[t.id]
-          if (!pos) return null
+        let highlight = ""
+        if (selectedSource === t.id) {
+          highlight = "stroke-yellow-400 stroke-4"
+        } else if (
+          selectedSource &&
+          adjacencyMap[selectedSource]?.includes(t.id) &&
+          t.owner &&
+          t.owner !== currentPlayer.id
+        ) {
+          highlight = "stroke-red-400 stroke-2"
+        }
 
-          const fillClass = getOwnerColor(t.owner)
-          const troopCount = t.troops || 0
+        return (
+          <g key={t.id} onClick={() => handleClick(t.id)} className="cursor-pointer">
+            <rect
+              x={pos.x}
+              y={pos.y}
+              width={120}
+              height={100}
+              rx="10"
+              className={`${fillClass} stroke-white stroke-2 ${highlight}`}
+            />
+            <text
+              x={pos.x + 60}
+              y={pos.y + 60}
+              textAnchor="middle"
+              fill="white"
+              fontSize="12"
+              fontWeight="bold"
+            >
+              {t.name} ({troopCount})
+            </text>
+          </g>
+        )
+      })}
 
-          let highlight = ""
-          if (selectedSource === t.id) {
-            highlight = "stroke-yellow-400 stroke-4"
-          } else if (
-            selectedSource &&
-            adjacencyMap[selectedSource]?.includes(t.id) &&
-            t.owner &&
-            t.owner !== currentPlayer.id
-          ) {
-            highlight = "stroke-red-400 stroke-2"
-          }
+      {Object.entries(continentOffsets).map(([name, offset]) => {
+        const labelX = (offset.x + 1.5) * gridSpacing + globalOffset.x
+        const labelY = offset.y * gridSpacing + globalOffset.y - 20
 
-          return (
-            <g key={t.id} onClick={() => handleClick(t.id)} className="cursor-pointer">
-              <rect
-                x={pos.x}
-                y={pos.y}
-                width={120}
-                height={100}
-                rx="10"
-                className={`${fillClass} stroke-white stroke-2 ${highlight}`}
-              />
-              <text
-                x={pos.x + 60}
-                y={pos.y + 60}
-                textAnchor="middle"
-                fill="white"
-                fontSize="12"
-                fontWeight="bold"
-              >
-                {t.name} ({troopCount})
-              </text>
-            </g>
-          )
-        })}
-
-        {Object.entries(continentOffsets).map(([name, offset]) => {
-          const labelX = (offset.x + 1.5) * gridSpacing + globalOffset.x
-          const labelY = offset.y * gridSpacing + globalOffset.y - 20
-
-          return (
-            <g key={name}>
-              <rect
-                x={labelX - 60}
-                y={labelY - 14}
-                width={120}
-                height={28}
-                rx="6"
-                fill="black"
-              />
-              <text
-                x={labelX}
-                y={labelY}
-                textAnchor="middle"
-                fontSize="16"
-                fill="white"
-                fontWeight="bold"
-                dominantBaseline="middle"
-              >
-                {name}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
-    </div>
+        return (
+          <g key={name}>
+            <rect
+              x={labelX - 60}
+              y={labelY - 14}
+              width={120}
+              height={28}
+              rx="6"
+              fill="black"
+            />
+            <text
+              x={labelX}
+              y={labelY}
+              textAnchor="middle"
+              fontSize="16"
+              fill="white"
+              fontWeight="bold"
+              dominantBaseline="middle"
+            >
+              {name}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
   )
 }
 

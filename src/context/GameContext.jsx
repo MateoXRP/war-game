@@ -91,6 +91,7 @@ export function GameProvider({ children }) {
     }
   }, [])
 
+  // This effect now runs always to detect phase changes properly
   useEffect(() => {
     handlePlacementToReinforcement({
       territories,

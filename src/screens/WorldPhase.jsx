@@ -1,4 +1,3 @@
-// src/screens/WorldPhase.jsx
 import { useGame } from "../context/GameContext"
 import WorldMap from "../components/map/WorldMap"
 import { useLog } from "../context/LogContext"
@@ -24,6 +23,27 @@ function WorldPhase() {
   const { actionLog } = useLog()
   const hasTurnStarted = useRef(false)
   const [leaderboard, setLeaderboard] = useState([])
+  const [confirmSurrender, setConfirmSurrender] = useState(false)
+
+  const [uiTroopsLeft, setUiTroopsLeft] = useState(35)
+
+  useEffect(() => {
+    if (isPlacementPhase && currentPlayer?.id === "human") {
+      setUiTroopsLeft(35)
+    }
+  }, [isPlacementPhase, currentPlayer])
+
+  useEffect(() => {
+    if (isPlacementPhase && currentPlayer?.id === "human") {
+      const playerTerritoriesCount = territories.filter(
+        (t) => t.owner === currentPlayer.id
+      ).length
+      const newTroopsLeft = 35 - playerTerritoriesCount
+      if (newTroopsLeft !== uiTroopsLeft) {
+        setUiTroopsLeft(newTroopsLeft)
+      }
+    }
+  }, [territories, isPlacementPhase, currentPlayer, uiTroopsLeft])
 
   useEffect(() => {
     if (isTurnPhase) {
@@ -41,13 +61,12 @@ function WorldPhase() {
             limit(10)
           )
           const snapshot = await getDocs(q)
-          const data = snapshot.docs.map(doc => doc.data())
+          const data = snapshot.docs.map((doc) => doc.data())
           setLeaderboard(data)
         } catch (err) {
           console.error("Failed to load leaderboard:", err)
         }
       }
-
       fetchLeaderboard()
     }
   }, [gameOver])
@@ -121,6 +140,7 @@ function WorldPhase() {
   }
 
   const handleSurrender = () => {
+    setConfirmSurrender(false)
     const cleared = territories.map((t) =>
       t.owner === "human" ? { ...t, owner: null, troops: 0 } : t
     )
@@ -142,35 +162,61 @@ function WorldPhase() {
         <div className="text-sm text-gray-300">
           Current Turn: {currentPlayer?.name || "Loading..."}
         </div>
-        <div className="text-sm text-gray-300">
-          Troops Remaining: {reinforcements[currentPlayer?.id] ?? 0}
-        </div>
       </div>
 
-      <div className="flex flex-1">
-        <div className="w-3/4">
+      <div className="flex flex-1 min-h-0">
+        <div className="flex-grow min-h-0">
           <WorldMap />
         </div>
-        <div className="w-1/4 bg-gray-900 p-4 border-l border-gray-700 flex flex-col justify-between">
-          <div className="flex-1 overflow-y-auto space-y-1">
+        <div className="w-1/4 bg-gray-900 p-4 border-l border-gray-700 flex flex-col">
+          {isTurnPhase && currentPlayer?.id === "human" && hasTurnStarted.current && (
+            <div className="mb-4 flex flex-col items-center space-y-2 sticky top-0 bg-gray-900 z-10 pt-2">
+              <button
+                onClick={nextTurn}
+                className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-green-500"
+              >
+                ✅ End Turn
+              </button>
+              {!confirmSurrender ? (
+                <button
+                  onClick={() => setConfirmSurrender(true)}
+                  className="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
+                >
+                  🏳️ Surrender
+                </button>
+              ) : (
+                <div className="flex space-x-2 mt-2">
+                  <span>Are you sure?</span>
+                  <button
+                    onClick={handleSurrender}
+                    className="bg-red-700 text-white font-semibold px-3 rounded"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setConfirmSurrender(false)}
+                    className="bg-gray-700 text-white font-semibold px-3 rounded"
+                  >
+                    No
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="text-sm text-gray-300 font-semibold mb-2">
+            Troops Remaining:{" "}
+            {isPlacementPhase ? uiTroopsLeft : reinforcements[currentPlayer?.id] ?? 0}
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-1 pt-4 max-h-[calc(100vh-10rem)]">
             <h2 className="text-lg font-semibold mb-2">📜 Battle Log</h2>
-            {[...actionLog].slice(-20).reverse().map((entry, index) => (
+            {[...actionLog].slice(-15).reverse().map((entry, index) => (
               <div key={index} className="text-sm text-gray-300">
                 {entry}
               </div>
             ))}
           </div>
-
-          {isTurnPhase && currentPlayer?.id === "human" && hasTurnStarted.current && (
-            <div className="mt-4 text-center">
-              <button
-                onClick={handleSurrender}
-                className="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
-              >
-                🏳️ Surrender
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>
