@@ -76,36 +76,77 @@ export function handleTurnPhaseLoop({
       (t) => t.owner === currentPlayer.id && t.troops > 1
     )
 
-    const attackQueue = []
+    // 🧠 Identify priority continents (≥6/9 owned)
+    const continentOwnership = {}
+    for (const t of territories) {
+      if (!continentOwnership[t.continent]) {
+        continentOwnership[t.continent] = { owned: 0, total: 0 }
+      }
+      continentOwnership[t.continent].total++
+      if (t.owner === currentPlayer.id) {
+        continentOwnership[t.continent].owned++
+      }
+    }
+
+    const priorityContinents = new Set(
+      Object.entries(continentOwnership)
+        .filter(([, data]) => data.owned >= 6)
+        .map(([name]) => name)
+    )
+
+    // 🧠 Build all possible valid attacks with priority scores
+    const allAttacks = []
 
     for (const from of owned) {
       const neighbors = adjacencyMap[from.id] || []
 
-      const enemies = neighbors
-        .map((id) => territories.find((t) => t.id === id))
-        .filter((t) =>
-          t &&
-          t.owner &&
-          t.owner !== currentPlayer.id &&
-          from.troops > t.troops // Avoid suicide attacks
-        )
-        .sort((a, b) => a.troops - b.troops) // Prioritize weak targets
+      for (const neighborId of neighbors) {
+        const to = territories.find((t) => t.id === neighborId)
+        if (
+          !to ||
+          !to.owner ||
+          to.owner === currentPlayer.id ||
+          from.troops <= to.troops // skip suicide attacks
+        ) {
+          continue
+        }
 
-      if (enemies.length > 0) {
-        const weakest = enemies[0]
-        attackQueue.push({ from: from.id, to: weakest.id })
+        let score = 0
+
+        if (priorityContinents.has(to.continent)) {
+          score += 10
+        }
+
+        if (from.troops > to.troops) {
+          score += 5
+        }
+
+        score += Math.max(0, 5 - to.troops)
+
+        allAttacks.push({ from: from.id, to: to.id, score })
       }
     }
 
-    if (attackQueue.length === 0) {
+    if (allAttacks.length === 0) {
       console.log(`⚠️ ${currentPlayer.name} has no valid attacks.`)
       memory.turnActive = false
       nextTurn()
       return
     }
 
+    allAttacks.sort((a, b) => b.score - a.score)
+
     const maxAttacks = 3
-    const attacksToPerform = attackQueue.slice(0, maxAttacks)
+    const attacksToPerform = []
+    const usedTargets = new Set()
+
+    for (const attack of allAttacks) {
+      if (!usedTargets.has(attack.to)) {
+        attacksToPerform.push(attack)
+        usedTargets.add(attack.to)
+      }
+      if (attacksToPerform.length >= maxAttacks) break
+    }
 
     function performNextAttack(index = 0) {
       if (index >= attacksToPerform.length) {
