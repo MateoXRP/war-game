@@ -22,7 +22,7 @@ export function handleTurnPhaseLoop({
     const interval = setInterval(() => {
       if (remaining <= 0) {
         clearInterval(interval)
-        performAttack()
+        startAttacks()
       } else {
         placeTurnTroop()
         remaining -= 1
@@ -32,7 +32,7 @@ export function handleTurnPhaseLoop({
     return
   }
 
-  performAttack()
+  startAttacks()
 
   function placeTurnTroop() {
     const owned = territories.filter((t) => t.owner === currentPlayer.id)
@@ -71,12 +71,12 @@ export function handleTurnPhaseLoop({
     }))
   }
 
-  function performAttack() {
+  function startAttacks() {
     const owned = territories.filter(
       (t) => t.owner === currentPlayer.id && t.troops > 1
     )
 
-    const attackPairs = []
+    const attackQueue = []
     for (const from of owned) {
       const neighbors = adjacencyMap[from.id] || []
       const enemies = neighbors
@@ -85,31 +85,42 @@ export function handleTurnPhaseLoop({
 
       if (enemies.length > 0) {
         const weakest = enemies.reduce((a, b) => (a.troops < b.troops ? a : b))
-        attackPairs.push({ from: from.id, to: weakest.id })
+        attackQueue.push({ from: from.id, to: weakest.id })
       }
     }
 
-    if (attackPairs.length === 0) {
+    if (attackQueue.length === 0) {
       console.log(`⚠️ ${currentPlayer.name} has no valid attacks.`)
       memory.turnActive = false
       nextTurn()
       return
     }
 
-    const { from, to } = attackPairs[0]
-    const fromTerritory = territories.find((t) => t.id === from)
-    const toTerritory = territories.find((t) => t.id === to)
+    // Cap to max 3 attacks per turn
+    const maxAttacks = 3
+    const attacksToPerform = attackQueue.slice(0, maxAttacks)
 
-    console.log(
-      `🪖 ${currentPlayer.name} attacks from ${fromTerritory.name} (${fromTerritory.troops}) → ${toTerritory.name} (${toTerritory.troops} owned by ${toTerritory.owner})`
-    )
+    function performNextAttack(index = 0) {
+      if (index >= attacksToPerform.length) {
+        memory.turnActive = false
+        nextTurn()
+        return
+      }
 
-    resolveBattle(from, to)
+      const { from, to } = attacksToPerform[index]
+      const fromTerritory = territories.find((t) => t.id === from)
+      const toTerritory = territories.find((t) => t.id === to)
 
-    setTimeout(() => {
-      memory.turnActive = false
-      nextTurn()
-    }, 350)
+      console.log(
+        `🪖 ${currentPlayer.name} attacks from ${fromTerritory.name} (${fromTerritory.troops}) → ${toTerritory.name} (${toTerritory.troops} owned by ${toTerritory.owner})`
+      )
+
+      resolveBattle(from, to)
+
+      setTimeout(() => performNextAttack(index + 1), 350)
+    }
+
+    performNextAttack()
   }
 }
 
