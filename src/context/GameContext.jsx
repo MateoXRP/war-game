@@ -144,6 +144,7 @@ export function GameProvider({ children }) {
           reinforcements,
           setReinforcements,
           resolveBattle,
+          logAction,
         })
       }, 300)
     }
@@ -172,6 +173,7 @@ export function GameProvider({ children }) {
 
     let attackerLosses = 0
     let defenderLosses = 0
+    let hasLogged = false
 
     for (let i = 0; i < Math.min(attackRolls.length, defenseRolls.length); i++) {
       if (attackRolls[i] > defenseRolls[i]) {
@@ -189,6 +191,10 @@ export function GameProvider({ children }) {
         if (t.id === defender.id) {
           const remainingTroops = t.troops - defenderLosses
           if (remainingTroops <= 0) {
+            if (!hasLogged) {
+              logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
+              hasLogged = true
+            }
             return {
               ...t,
               owner: attacker.owner,

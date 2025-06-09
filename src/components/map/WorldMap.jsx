@@ -15,9 +15,9 @@ function WorldMap() {
     setReinforcements,
     selectedSource,
     setSelectedSource,
-    selectedTarget,
     setSelectedTarget,
     resolveBattle,
+    logAction,
   } = useGame()
 
   const handleClick = (id) => {
@@ -32,6 +32,7 @@ function WorldMap() {
           t.id === id ? { ...t, owner: currentPlayer.id, troops: 1 } : t
         )
       )
+      logAction(`🏴 ${currentPlayer.name} claimed ${target.name}`)
       nextTurn()
     }
 
@@ -45,6 +46,7 @@ function WorldMap() {
           t.id === id ? { ...t, troops: t.troops + 1 } : t
         )
       )
+      logAction(`➕ ${currentPlayer.name} reinforced ${target.name}`)
 
       setReinforcements((prev) => {
         const remaining = prev[currentPlayer.id] - 1
@@ -66,6 +68,8 @@ function WorldMap() {
             t.id === id ? { ...t, troops: t.troops + 1 } : t
           )
         )
+        logAction(`➕ ${currentPlayer.name} reinforced ${target.name}`)
+
         setReinforcements((prev) => ({
           ...prev,
           [currentPlayer.id]: prev[currentPlayer.id] - 1,

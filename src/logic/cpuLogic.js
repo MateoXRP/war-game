@@ -20,6 +20,7 @@ export function handleCpuTurn({
   reinforcements,
   setReinforcements,
   resolveBattle,
+  logAction,
 }) {
   const memory = cpuMemory[currentPlayer.id]
 
@@ -27,7 +28,7 @@ export function handleCpuTurn({
   if (!isPlacementPhase && isPlayerEliminated(territories, currentPlayer.id)) {
     console.log(`💀 ${currentPlayer.name} has been eliminated. Skipping turn.`)
     if (memory) {
-      memory.turnActive = false // ✅ reset flag so CPU doesn't get stuck
+      memory.turnActive = false
     }
     nextTurn()
     return
@@ -40,6 +41,7 @@ export function handleCpuTurn({
       currentPlayer,
       nextTurn,
       memory,
+      logAction,
     })
   }
 
@@ -52,6 +54,7 @@ export function handleCpuTurn({
       reinforcements,
       setReinforcements,
       memory,
+      logAction,
     })
   }
 

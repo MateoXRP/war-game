@@ -17,6 +17,7 @@ export function handleClaimPhase({
   currentPlayer,
   nextTurn,
   memory,
+  logAction,
 }) {
   const unclaimed = territories.filter((t) => !t.owner)
   if (unclaimed.length === 0) return
@@ -75,6 +76,7 @@ export function handleClaimPhase({
           : t
       )
     )
+    logAction?.(`🏴 ${currentPlayer.name} claimed ${territory.name}`)
     nextTurn()
   }
 

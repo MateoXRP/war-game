@@ -10,6 +10,7 @@ export function handleReinforcementLoop({
   reinforcements,
   setReinforcements,
   memory,
+  logAction,
 }) {
   const placeOneTroop = () => {
     if (reinforcements[currentPlayer.id] <= 0) return
@@ -41,6 +42,8 @@ export function handleReinforcementLoop({
         t.id === target.id ? { ...t, troops: t.troops + 1 } : t
       )
     )
+
+    logAction?.(`➕ ${currentPlayer.name} reinforced ${target.name}`)
 
     setReinforcements((prev) => {
       const remaining = prev[currentPlayer.id] - 1
