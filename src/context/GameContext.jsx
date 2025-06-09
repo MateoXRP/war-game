@@ -3,6 +3,11 @@ import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { initialTerritories, players as basePlayers } from "../data/gameData"
 import { handleCpuTurn } from "../logic/cpuLogic"
 import { resolveBattle as battleLogic } from "../logic/battleLogic"
+import {
+  handlePlacementToReinforcement,
+  handleReinforcementToTurn,
+  handleTurnStartTroops,
+} from "../logic/phaseLogic"
 
 const GameContext = createContext()
 
@@ -40,6 +45,7 @@ export function GameProvider({ children }) {
     setSelectedTarget(null)
   }
 
+  // Initial setup: roll dice and assign reinforcements
   useEffect(() => {
     if (!playerOrderRef.current) {
       const rolls = basePlayers.map(p => ({ ...p, roll: rollDie() }))
@@ -55,66 +61,42 @@ export function GameProvider({ children }) {
     }
   }, [])
 
+  // Placement → Reinforcement
   useEffect(() => {
-    const claimed = territories.filter((t) => t.owner).length
-    if (isPlacementPhase && claimed >= territories.length) {
-      setIsPlacementPhase(false)
-      setIsReinforcementPhase(true)
-
-      const counts = {}
-      playerOrderRef.current.forEach((p) => {
-        const owned = territories.filter((t) => t.owner === p.id).length
-        const remaining = 35 - owned
-        counts[p.id] = Math.max(remaining, 0)
-      })
-      setReinforcements(counts)
-    }
+    handlePlacementToReinforcement({
+      territories,
+      isPlacementPhase,
+      playerOrderRef,
+      setIsPlacementPhase,
+      setIsReinforcementPhase,
+      setReinforcements,
+    })
   }, [territories, isPlacementPhase])
 
+  // Reinforcement → Turn
   useEffect(() => {
-    if (
-      isReinforcementPhase &&
-      Object.values(reinforcements).every((r) => r <= 0)
-    ) {
-      setIsReinforcementPhase(false)
-      setIsTurnPhase(true)
-    }
+    handleReinforcementToTurn({
+      reinforcements,
+      isReinforcementPhase,
+      setIsReinforcementPhase,
+      setIsTurnPhase,
+    })
   }, [reinforcements, isReinforcementPhase])
 
+  // Start of Turn → Award bonus troops
   useEffect(() => {
-    if (isTurnPhase && currentPlayer && turnIndex !== troopsAwardedTurn) {
-      const owned = territories.filter(t => t.owner === currentPlayer.id)
-      const ownedIds = new Set(owned.map(t => t.id))
-
-      const bonusByContinent = {
-        "North America": 4,
-        "Europe": 6,
-        "Asia": 4,
-        "South America": 4,
-        "Africa": 6,
-        "Australia": 4,
-      }
-
-      let continentBonus = 0
-      for (const [continent, bonus] of Object.entries(bonusByContinent)) {
-        const allInContinent = territories.filter(t => t.continent === continent).map(t => t.id)
-        const fullyOwned = allInContinent.every(id => ownedIds.has(id))
-        if (fullyOwned) {
-          continentBonus += bonus
-        }
-      }
-
-      const baseTroops = Math.max(3, Math.floor(owned.length / 3))
-      const total = baseTroops + continentBonus
-
-      setReinforcements(prev => ({
-        ...prev,
-        [currentPlayer.id]: total,
-      }))
-      setTroopsAwardedTurn(turnIndex)
-    }
+    handleTurnStartTroops({
+      isTurnPhase,
+      currentPlayer,
+      territories,
+      turnIndex,
+      troopsAwardedTurn,
+      setReinforcements,
+      setTroopsAwardedTurn,
+    })
   }, [isTurnPhase, currentPlayer, territories, turnIndex, troopsAwardedTurn])
 
+  // CPU Turn Handling
   useEffect(() => {
     const isCpu = currentPlayer?.isCPU
     if (!isCpu) return
