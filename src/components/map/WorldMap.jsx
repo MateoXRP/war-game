@@ -199,14 +199,14 @@ function WorldMap() {
 
         let highlight = ""
         if (selectedSource === t.id) {
-          highlight = "stroke-yellow-400 stroke-4"
+          highlight = "stroke-yellow-300 stroke-[8] drop-shadow-lg"
         } else if (
           selectedSource &&
           adjacencyMap[selectedSource]?.includes(t.id) &&
           t.owner &&
           t.owner !== currentPlayer.id
         ) {
-          highlight = "stroke-red-400 stroke-2"
+          highlight = "stroke-red-500 stroke-[6] drop-shadow-md"
         }
 
         return (
