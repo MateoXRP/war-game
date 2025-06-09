@@ -1,7 +1,4 @@
 // src/logic/battleLogic.js
-function rollDie() {
-  return Math.floor(Math.random() * 6) + 1
-}
 
 export function resolveBattle({
   attackerId,
@@ -17,56 +14,52 @@ export function resolveBattle({
   const attacker = territories.find((t) => t.id === attackerId)
   const defender = territories.find((t) => t.id === defenderId)
 
-  if (!attacker || !defender || attacker.troops < 2) return
+  if (!attacker || !defender) return
 
-  const attackerDice = Math.min(3, attacker.troops - 1)
-  const defenderDice = Math.min(2, defender.troops)
+  const attackDice = []
+  const defendDice = []
 
-  const attackRolls = Array.from({ length: attackerDice }, rollDie).sort((a, b) => b - a)
-  const defenseRolls = Array.from({ length: defenderDice }, rollDie).sort((a, b) => b - a)
+  const maxAttackDice = Math.min(attacker.troops - 1, 3)
+  const maxDefendDice = Math.min(defender.troops, 2)
+
+  for (let i = 0; i < maxAttackDice; i++) {
+    attackDice.push(Math.floor(Math.random() * 6) + 1)
+  }
+
+  for (let i = 0; i < maxDefendDice; i++) {
+    defendDice.push(Math.floor(Math.random() * 6) + 1)
+  }
+
+  attackDice.sort((a, b) => b - a)
+  defendDice.sort((a, b) => b - a)
 
   let attackerLosses = 0
   let defenderLosses = 0
 
-  for (let i = 0; i < Math.min(attackRolls.length, defenseRolls.length); i++) {
-    if (attackRolls[i] > defenseRolls[i]) {
+  for (let i = 0; i < Math.min(attackDice.length, defendDice.length); i++) {
+    if (attackDice[i] > defendDice[i]) {
       defenderLosses++
     } else {
       attackerLosses++
     }
   }
 
-  const defenderRemaining = defender.troops - defenderLosses
-  const conquered = defenderRemaining <= 0
-
-  setTerritories((prev) =>
-    prev.map((t) => {
-      if (t.id === attacker.id) {
-        return { ...t, troops: t.troops - attackerLosses }
-      }
-      if (t.id === defender.id) {
-        return conquered
-          ? {
-              ...t,
-              owner: attacker.owner,
-              troops: attackerDice - attackerLosses,
-            }
-          : { ...t, troops: defenderRemaining }
-      }
-      return t
-    })
-  )
-
-  const defenderPlayer = playerOrder?.find((p) => p.id === defender.owner)
-  const defenderName = defenderPlayer?.name || `Player ${defender.owner}`
+  attacker.troops -= attackerLosses
+  defender.troops -= defenderLosses
 
   logAction(
-    `⚔️ ${currentPlayer.name} attacked ${defenderName} on ${defender.name} from ${attacker.name}. Losses: A${attackerLosses}/D${defenderLosses}`
+    `⚔️ ${currentPlayer.name} attacked ${defender.name} from ${attacker.name}. Losses: A${attackerLosses}/D${defenderLosses}`
   )
-  if (conquered) {
-    logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
+
+  if (defender.troops <= 0) {
+    defender.owner = attacker.owner
+    const moveIn = attackDice.length
+    defender.troops = moveIn
+    attacker.troops -= moveIn
+    logAction(`🏳️ You conquered ${defender.name}`)
   }
 
+  setTerritories([...territories])
   setSelectedSource(null)
   setSelectedTarget(null)
 }
