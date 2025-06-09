@@ -56,16 +56,21 @@ export function GameProvider({ children }) {
     const playerName = localStorage.getItem("playerName")
     if (!playerName) return
 
-    const statsRef = doc(db, "players", playerName, "stats", "global")
+    const statsRef = doc(db, "war_leaderboard", playerName)
 
     try {
       const snap = await getDoc(statsRef)
       if (!snap.exists()) {
-        await setDoc(statsRef, { wins: 0, losses: 0 })
+        await setDoc(statsRef, {
+          name: playerName,
+          wins: outcome === "win" ? 1 : 0,
+          losses: outcome === "loss" ? 1 : 0,
+        })
+      } else {
+        await updateDoc(statsRef, {
+          [outcome === "win" ? "wins" : "losses"]: increment(1),
+        })
       }
-      await updateDoc(statsRef, {
-        [outcome === "win" ? "wins" : "losses"]: increment(1),
-      })
     } catch (err) {
       console.error("Failed to record game result:", err)
     }
