@@ -145,17 +145,18 @@ function WorldMap() {
       height="750"
       className="rounded-xl bg-blue-800 mx-auto mb-2"
     >
-      {/* Overlay image must be rendered first so it's behind everything */}
+      {/* Background overlay */}
       <image
         href="/world-overlay.png"
         x="0"
         y="0"
         width="1350"
         height="900"
-	style={{ opacity: 0.5 }}
+        opacity="0.25"
         preserveAspectRatio="xMidYMid slice"
       />
 
+      {/* Connection lines */}
       {centerLines.map(([from, to], index) => {
         const a = positions[from]
         const b = positions[to]
@@ -186,6 +187,7 @@ function WorldMap() {
         )
       })}
 
+      {/* Territories */}
       {state.map((t) => {
         const pos = positions[t.id]
         if (!pos) return null
@@ -216,16 +218,13 @@ function WorldMap() {
               className={`${fillClass} stroke-white stroke-2 ${highlight}`}
             />
             {flag && (
-              <text
-                x={pos.x + 60}
-                y={pos.y + 25}
-                textAnchor="middle"
-                fontSize="20"
-                dominantBaseline="middle"
-                pointerEvents="none"
-              >
-                {flag}
-              </text>
+              <image
+                href={`https://emojicdn.elk.sh/${flag}?style=twitter&size=64`}
+                x={pos.x + 48}
+                y={pos.y + 4}
+                width="24"
+                height="24"
+              />
             )}
             <text
               x={pos.x + 60}
@@ -256,6 +255,7 @@ function WorldMap() {
         )
       })}
 
+      {/* Continent Labels */}
       {Object.entries(continentOffsets).map(([name, offset]) => {
         const labelX = (offset.x + 1.5) * gridSpacing + globalOffset.x
         const labelY = offset.y * gridSpacing + globalOffset.y - 20
