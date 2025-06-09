@@ -1,6 +1,6 @@
 // src/components/map/WorldMap.jsx
 import { useGame } from "../../context/GameContext"
-import { adjacencyMap } from "../../data/territoryGraph"
+import { adjacencyMap, flagByTerritoryId } from "../../data/territoryGraph"
 
 function WorldMap() {
   const {
@@ -196,6 +196,7 @@ function WorldMap() {
 
         const fillClass = getOwnerColor(t.owner)
         const troopCount = t.troops || 0
+        const flag = flagByTerritoryId[t.id]
 
         let highlight = ""
         if (selectedSource === t.id) {
@@ -219,9 +220,21 @@ function WorldMap() {
               rx="10"
               className={`${fillClass} stroke-white stroke-2 ${highlight}`}
             />
+            {flag && (
+              <text
+                x={pos.x + 60}
+                y={pos.y + 25}
+                textAnchor="middle"
+                fontSize="20"
+                dominantBaseline="middle"
+                pointerEvents="none"
+              >
+                {flag}
+              </text>
+            )}
             <text
               x={pos.x + 60}
-              y={pos.y + 30}
+              y={pos.y + 50}
               textAnchor="middle"
               fill="white"
               fontSize="14"
@@ -233,7 +246,7 @@ function WorldMap() {
             </text>
             <text
               x={pos.x + 60}
-              y={pos.y + 55}
+              y={pos.y + 75}
               textAnchor="middle"
               fill="white"
               fontSize="16"
