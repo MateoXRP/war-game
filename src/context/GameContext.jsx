@@ -30,9 +30,9 @@ export function GameProvider({ children }) {
   const [reinforcements, setReinforcements] = useState({})
   const [troopsAwardedTurn, setTroopsAwardedTurn] = useState(-1)
   const [lastCpuPlacementTurn, setLastCpuPlacementTurn] = useState(null)
-
   const [gameOver, setGameOver] = useState(false)
   const [winner, setWinner] = useState(null)
+  const [conqueredThisTurn, setConqueredThisTurn] = useState(false)
 
   const {
     selectedSource,
@@ -50,9 +50,10 @@ export function GameProvider({ children }) {
   const nextTurn = () => {
     if (!playerOrder || territories.length === 0) return
 
+    setConqueredThisTurn(false)
+
     let nextIndex = turnIndex + 1
     let safety = 0
-
     while (safety < 10) {
       const nextPlayer = playerOrder[nextIndex % playerOrder.length]
       const ownsTiles =
@@ -146,14 +147,9 @@ export function GameProvider({ children }) {
     const isCpu = currentPlayer?.isCPU
     if (!isCpu) return
 
-    const shouldRunPlacement =
-      isPlacementPhase && turnIndex !== lastCpuPlacementTurn
-
-    const shouldRunReinforcement =
-      isReinforcementPhase && reinforcements[currentPlayer.id] > 0
-
-    const shouldRunTurn =
-      isTurnPhase && reinforcements[currentPlayer.id] > 0
+    const shouldRunPlacement = isPlacementPhase && turnIndex !== lastCpuPlacementTurn
+    const shouldRunReinforcement = isReinforcementPhase && reinforcements[currentPlayer.id] > 0
+    const shouldRunTurn = isTurnPhase && reinforcements[currentPlayer.id] > 0
 
     if (shouldRunPlacement || shouldRunReinforcement || shouldRunTurn) {
       if (shouldRunPlacement) {
@@ -187,11 +183,7 @@ export function GameProvider({ children }) {
   ])
 
   useEffect(() => {
-    if (
-      !isTurnPhase ||
-      !playerOrderRef.current ||
-      playerOrderRef.current.length === 0
-    )
+    if (!isTurnPhase || !playerOrderRef.current || playerOrderRef.current.length === 0)
       return
 
     const activePlayers = playerOrderRef.current.filter((p) =>
@@ -202,11 +194,7 @@ export function GameProvider({ children }) {
       if (activePlayers.length === 1) {
         setGameOver(true)
         setWinner(activePlayers[0])
-        if (activePlayers[0].id === "human") {
-          recordGameResult("win")
-        } else {
-          recordGameResult("loss")
-        }
+        recordGameResult(activePlayers[0].id === "human" ? "win" : "loss")
       } else {
         const humanAlive = territories.some((t) => t.owner === "human")
         if (!humanAlive) {
@@ -220,6 +208,7 @@ export function GameProvider({ children }) {
   }, [territories, gameOver, isTurnPhase])
 
   function resolveBattle(attackerId, defenderId) {
+    const before = territories.find((t) => t.id === defenderId)?.owner
     battleLogic({
       attackerId,
       defenderId,
@@ -231,6 +220,10 @@ export function GameProvider({ children }) {
       setSelectedSource,
       setSelectedTarget,
     })
+    const after = territories.find((t) => t.id === defenderId)?.owner
+    if (before && after && before !== after && after === currentPlayer.id) {
+      setConqueredThisTurn(true)
+    }
     resetSelection()
   }
 

@@ -14,7 +14,7 @@ export function resolveBattle({
   const attacker = territories.find((t) => t.id === attackerId)
   const defender = territories.find((t) => t.id === defenderId)
 
-  if (!attacker || !defender) return
+  if (!attacker || !defender) return false
 
   const attackDice = []
   const defendDice = []
@@ -51,17 +51,21 @@ export function resolveBattle({
     `⚔️ ${currentPlayer.name} attacked ${defender.name} from ${attacker.name}. Losses: A${attackerLosses}/D${defenderLosses}`
   )
 
+  let conquered = false
+
   if (defender.troops <= 0) {
     defender.owner = attacker.owner
     const moveIn = attackDice.length
     defender.troops = moveIn
     attacker.troops -= moveIn
     logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
+    conquered = true
   }
 
-  // ✅ Deep clone to ensure state updates correctly
-  setTerritories(prev => prev.map(t => ({ ...t })))
+  setTerritories([...territories])
   setSelectedSource(null)
   setSelectedTarget(null)
+
+  return conquered
 }
 

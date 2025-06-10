@@ -24,7 +24,6 @@ function WorldPhase() {
   const hasTurnStarted = useRef(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [confirmSurrender, setConfirmSurrender] = useState(false)
-
   const [uiTroopsLeft, setUiTroopsLeft] = useState(35)
 
   useEffect(() => {
@@ -70,6 +69,16 @@ function WorldPhase() {
       fetchLeaderboard()
     }
   }, [gameOver])
+
+  const handleSurrender = () => {
+    setConfirmSurrender(false)
+    const cleared = territories.map((t) =>
+      t.owner === "human" ? { ...t, owner: null, troops: 0 } : t
+    )
+    setTerritories(cleared)
+    setReinforcements((prev) => ({ ...prev, human: 0 }))
+    nextTurn()
+  }
 
   if (gameOver) {
     const isVictory = winner?.id === "human"
@@ -139,16 +148,6 @@ function WorldPhase() {
     )
   }
 
-  const handleSurrender = () => {
-    setConfirmSurrender(false)
-    const cleared = territories.map((t) =>
-      t.owner === "human" ? { ...t, owner: null, troops: 0 } : t
-    )
-    setTerritories(cleared)
-    setReinforcements((prev) => ({ ...prev, human: 0 }))
-    nextTurn()
-  }
-
   return (
     <div className="flex flex-col min-h-screen bg-background text-white">
       <div className="flex justify-between items-center px-6 py-4 bg-gray-800 shadow">
@@ -211,7 +210,7 @@ function WorldPhase() {
 
           <div className="flex-1 overflow-y-auto space-y-1 pt-4 max-h-[calc(100vh-10rem)]">
             <h2 className="text-lg font-semibold mb-2">📜 Battle Log</h2>
-            {[...actionLog].slice(-15).reverse().map((entry, index) => (
+            {[...actionLog].reverse().map((entry, index) => (
               <div key={index} className="text-sm text-gray-300">
                 {entry}
               </div>

@@ -73,7 +73,9 @@ export function handleTurnPhaseLoop({
 
   function startAttackLoop() {
     const runNextRound = () => {
-      const attacks = getBestAttackSet()
+      const fresh = structuredClone(territories)
+      const attacks = getBestAttackSet(fresh)
+
       if (attacks.length === 0) {
         memory.turnActive = false
         nextTurn()
@@ -88,13 +90,13 @@ export function handleTurnPhaseLoop({
     runNextRound()
   }
 
-  function getBestAttackSet() {
-    const owned = territories.filter(
+  function getBestAttackSet(currentTerritories) {
+    const owned = currentTerritories.filter(
       (t) => t.owner === currentPlayer.id && t.troops > 1
     )
 
     const continentOwnership = {}
-    for (const t of territories) {
+    for (const t of currentTerritories) {
       if (!continentOwnership[t.continent]) {
         continentOwnership[t.continent] = { owned: 0, total: 0 }
       }
@@ -116,12 +118,12 @@ export function handleTurnPhaseLoop({
       const neighbors = adjacencyMap[from.id] || []
 
       for (const neighborId of neighbors) {
-        const to = territories.find((t) => t.id === neighborId)
+        const to = currentTerritories.find((t) => t.id === neighborId)
         if (
           !to ||
           !to.owner ||
           to.owner === currentPlayer.id ||
-          from.troops < to.troops // allow equal troop attacks
+          from.troops <= to.troops
         ) {
           continue
         }
@@ -130,7 +132,7 @@ export function handleTurnPhaseLoop({
         if (priorityContinents.has(to.continent)) score += 10
         if (from.troops > to.troops) score += 5
         score += Math.max(0, 5 - to.troops)
-        if (to.owner === "human") score += 15
+        if (to.owner === "human") score += 15 // Prioritize attacking human
 
         allAttacks.push({ from: from.id, to: to.id, score })
       }
@@ -138,9 +140,18 @@ export function handleTurnPhaseLoop({
 
     allAttacks.sort((a, b) => b.score - a.score)
 
-    if (allAttacks.length === 0) return []
+    const usedTargets = new Set()
+    const attacksToPerform = []
 
-    return [allAttacks[0]] // Always perform at least one attack
+    for (const attack of allAttacks) {
+      if (!usedTargets.has(attack.to)) {
+        attacksToPerform.push(attack)
+        usedTargets.add(attack.to)
+      }
+      if (attacksToPerform.length >= 3) break
+    }
+
+    return attacksToPerform
   }
 
   function executeAttackSet(attacks, onComplete) {
@@ -151,13 +162,12 @@ export function handleTurnPhaseLoop({
       }
 
       const { from, to } = attacks[index]
-      const fromTerritory = territories.find((t) => t.id === from)
-      const toTerritory = territories.find((t) => t.id === to)
 
       console.log(
-        `🪖 ${currentPlayer.name} attacks from ${fromTerritory.name} (${fromTerritory.troops}) → ${toTerritory.name} (${toTerritory.troops} owned by ${toTerritory.owner})`
+        `🪖 ${currentPlayer.name} attacks from ${from} → ${to}`
       )
 
+      // ✅ Corrected to call the GameContext-wrapped resolveBattle
       resolveBattle(from, to)
 
       setTimeout(() => perform(index + 1), 350)
