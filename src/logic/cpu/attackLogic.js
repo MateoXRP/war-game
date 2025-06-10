@@ -98,10 +98,10 @@ export function handleTurnPhaseLoop({
       if (!continentOwnership[t.continent]) {
         continentOwnership[t.continent] = { owned: 0, total: 0 }
       }
-      continentOwnership[t.continent].total++
       if (t.owner === currentPlayer.id) {
         continentOwnership[t.continent].owned++
       }
+      continentOwnership[t.continent].total++
     }
 
     const priorityContinents = new Set(
@@ -121,7 +121,7 @@ export function handleTurnPhaseLoop({
           !to ||
           !to.owner ||
           to.owner === currentPlayer.id ||
-          from.troops <= to.troops
+          from.troops < to.troops // allow equal troop attacks
         ) {
           continue
         }
@@ -130,6 +130,7 @@ export function handleTurnPhaseLoop({
         if (priorityContinents.has(to.continent)) score += 10
         if (from.troops > to.troops) score += 5
         score += Math.max(0, 5 - to.troops)
+        if (to.owner === "human") score += 15
 
         allAttacks.push({ from: from.id, to: to.id, score })
       }
@@ -137,18 +138,9 @@ export function handleTurnPhaseLoop({
 
     allAttacks.sort((a, b) => b.score - a.score)
 
-    const usedTargets = new Set()
-    const attacksToPerform = []
+    if (allAttacks.length === 0) return []
 
-    for (const attack of allAttacks) {
-      if (!usedTargets.has(attack.to)) {
-        attacksToPerform.push(attack)
-        usedTargets.add(attack.to)
-      }
-      if (attacksToPerform.length >= 3) break
-    }
-
-    return attacksToPerform
+    return [allAttacks[0]] // Always perform at least one attack
   }
 
   function executeAttackSet(attacks, onComplete) {

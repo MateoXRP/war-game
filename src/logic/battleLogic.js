@@ -56,10 +56,11 @@ export function resolveBattle({
     const moveIn = attackDice.length
     defender.troops = moveIn
     attacker.troops -= moveIn
-    logAction(`🏳️ You conquered ${defender.name}`)
+    logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
   }
 
-  setTerritories([...territories])
+  // ✅ Deep clone to ensure state updates correctly
+  setTerritories(prev => prev.map(t => ({ ...t })))
   setSelectedSource(null)
   setSelectedTarget(null)
 }
