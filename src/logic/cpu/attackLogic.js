@@ -119,20 +119,20 @@ export function handleTurnPhaseLoop({
 
       for (const neighborId of neighbors) {
         const to = currentTerritories.find((t) => t.id === neighborId)
-        if (
-          !to ||
-          !to.owner ||
-          to.owner === currentPlayer.id ||
-          from.troops <= to.troops
-        ) {
+        if (!to || !to.owner || to.owner === currentPlayer.id) {
           continue
         }
 
         let score = 0
-        if (priorityContinents.has(to.continent)) score += 10
-        if (from.troops > to.troops) score += 5
+
+        // Troop comparison logic — prefer stronger but allow equal
+        if (from.troops > to.troops) score += 10
+        else if (from.troops === to.troops) score += 3
+        else score -= 5
+
+        if (priorityContinents.has(to.continent)) score += 5
         score += Math.max(0, 5 - to.troops)
-        if (to.owner === "human") score += 15 // Prioritize attacking human
+        if (to.owner === "human") score += 15
 
         allAttacks.push({ from: from.id, to: to.id, score })
       }
@@ -167,7 +167,6 @@ export function handleTurnPhaseLoop({
         `🪖 ${currentPlayer.name} attacks from ${from} → ${to}`
       )
 
-      // ✅ Corrected to call the GameContext-wrapped resolveBattle
       resolveBattle(from, to)
 
       setTimeout(() => perform(index + 1), 350)
