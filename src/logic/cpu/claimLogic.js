@@ -24,13 +24,23 @@ export function handleClaimPhase({
 
   const continentMap = groupByContinent(territories)
 
-  // First time: pick a preferred continent
+  // First time: pick a preferred continent (corners only)
   if (!memory.continent) {
-    const emptyContinent = Object.entries(continentMap).find(
-      ([, group]) => group.every((t) => !t.owner)
+    const preferredPool = ["North America", "South America", "Asia", "Australia"]
+    const filtered = Object.entries(continentMap).filter(
+      ([name, group]) =>
+        preferredPool.includes(name) && group.every((t) => !t.owner)
     )
-    if (emptyContinent) {
-      memory.continent = emptyContinent[0]
+    if (filtered.length > 0) {
+      memory.continent = randomPick(filtered)[0]
+    } else {
+      // fallback to any empty continent
+      const emptyContinent = Object.entries(continentMap).find(
+        ([, group]) => group.every((t) => !t.owner)
+      )
+      if (emptyContinent) {
+        memory.continent = emptyContinent[0]
+      }
     }
   }
 

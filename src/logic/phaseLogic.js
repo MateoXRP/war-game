@@ -52,12 +52,12 @@ export function handleTurnStartTroops({
   const ownedIds = new Set(owned.map(t => t.id))
 
   const bonusByContinent = {
-    "North America": 4,
-    "Europe": 6,
-    "Asia": 4,
-    "South America": 4,
-    "Africa": 6,
-    "Australia": 4,
+    "North America": 5,
+    "Europe": 10,
+    "Asia": 5,
+    "South America": 5,
+    "Africa": 10,
+    "Australia": 5,
   }
 
   let continentBonus = 0
