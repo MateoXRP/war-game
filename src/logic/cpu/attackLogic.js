@@ -72,11 +72,14 @@ export function handleTurnPhaseLoop({
   }
 
   function startAttackLoop() {
+    logAction?.(`🧠 ${currentPlayer.name} begins attack phase...`)
+
     const runNextRound = () => {
       const fresh = structuredClone(territories)
       const attacks = getBestAttackSet(fresh)
 
       if (attacks.length === 0) {
+        logAction?.(`✅ ${currentPlayer.name} ends attack phase.`)
         memory.turnActive = false
         nextTurn()
         return
@@ -92,7 +95,7 @@ export function handleTurnPhaseLoop({
 
   function getBestAttackSet(currentTerritories) {
     const owned = currentTerritories.filter(
-      (t) => t.owner === currentPlayer.id && t.troops > 1
+      (t) => t.owner === currentPlayer.id && t.troops > 2
     )
 
     const continentOwnership = {}
@@ -175,4 +178,3 @@ export function handleTurnPhaseLoop({
     perform()
   }
 }
-

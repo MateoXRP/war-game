@@ -1,4 +1,5 @@
 // src/logic/battleLogic.js
+import { flagByTerritoryId } from "../data/territoryGraph"
 
 export function resolveBattle({
   attackerId,
@@ -58,7 +59,10 @@ export function resolveBattle({
     const moveIn = attackDice.length
     defender.troops = moveIn
     attacker.troops -= moveIn
-    logAction(`🏳️ ${currentPlayer.name} conquered ${defender.name}`)
+
+    const conqueredFlag = flagByTerritoryId[defender.id] || "🏳️"
+    logAction(`${conqueredFlag} ${currentPlayer.name} conquered ${defender.name}`)
+
     conquered = true
   }
 
@@ -68,4 +72,3 @@ export function resolveBattle({
 
   return conquered
 }
-
