@@ -157,15 +157,12 @@ function WorldPhase() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-white">
       <div className="flex justify-between items-center px-6 py-4 bg-gray-800 shadow">
-        <div className="text-lg font-semibold flex items-center space-x-3">
-          <span>🌍 War Game</span>
-          <span className="text-gray-300 text-sm">
-            {isPlacementPhase
-              ? "📦 Placement Phase"
-              : isReinforcementPhase
-              ? "➕ Reinforcement Phase"
-              : "⚔️ Turn Phase"}
-          </span>
+        <div className="text-lg font-semibold">
+          🌍 War Game {isPlacementPhase
+            ? "📦 Placement Phase"
+            : isReinforcementPhase
+            ? "➕ Reinforcement Phase"
+            : "⚔️ Turn Phase"}
         </div>
         <div className="text-sm text-gray-300">
           Current Turn: {currentPlayer?.name || "Loading..."}
@@ -178,45 +175,56 @@ function WorldPhase() {
         </div>
         <div className="w-1/4 bg-gray-900 p-4 border-l border-gray-700 flex flex-col">
           <div className="text-sm text-gray-300 font-semibold mb-2">
-            Troops Remaining:{" "}
-            {isPlacementPhase
+            Troops Remaining: {isPlacementPhase
               ? uiTroopsLeft
               : (isReinforcementPhase || isTurnPhase) && currentPlayer?.id
               ? reinforcements[currentPlayer.id] ?? 0
               : "-"}
           </div>
 
-          <div className="text-sm font-semibold text-white mb-1">📜 Battle Log</div>
-          <div className="flex-1 overflow-y-auto text-xs space-y-1">
-            {[...actionLog.slice(-50)].reverse().map((entry, index) => (
-              <div key={index} className="text-gray-400">
+          {isTurnPhase && currentPlayer?.id === "human" && hasTurnStarted.current && (
+            <div className="mb-4 flex flex-col items-center space-y-2 sticky top-0 bg-gray-900 z-10 pt-2 px-2">
+              <button
+                onClick={nextTurn}
+                className="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-green-500"
+              >
+                ✅ End Turn
+              </button>
+              {!confirmSurrender ? (
+                <button
+                  onClick={() => setConfirmSurrender(true)}
+                  className="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
+                >
+                  🏳️ Surrender
+                </button>
+              ) : (
+                <div className="flex space-x-2 mt-2">
+                  <span>Are you sure?</span>
+                  <button
+                    onClick={handleSurrender}
+                    className="bg-red-700 text-white font-semibold px-3 rounded"
+                  >
+                    ✅ Yes
+                  </button>
+                  <button
+                    onClick={() => setConfirmSurrender(false)}
+                    className="bg-gray-700 text-white font-semibold px-3 rounded"
+                  >
+                    ❌ No
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto pt-4 space-y-1 max-h-[calc(100vh-10rem)]">
+            <h2 className="text-lg font-semibold mb-2">📜 Battle Log</h2>
+            {[...actionLog].reverse().map((entry, index) => (
+              <div key={index} className="text-sm text-gray-300">
                 {entry}
               </div>
             ))}
           </div>
-
-          {!isPlacementPhase && (
-            <div className="mt-4 space-y-2">
-              <button
-                onClick={nextTurn}
-                className="bg-blue-600 w-full text-white font-semibold py-1 rounded-xl shadow hover:bg-blue-500"
-              >
-                ✅ End Turn
-              </button>
-              <button
-                onClick={() => {
-                  if (confirmSurrender) {
-                    handleSurrender()
-                  } else {
-                    setConfirmSurrender(true)
-                  }
-                }}
-                className="bg-red-600 w-full text-white font-semibold py-1 rounded-xl shadow hover:bg-red-500"
-              >
-                {confirmSurrender ? "❗ Are you sure?" : "🏳️ Surrender"}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>
