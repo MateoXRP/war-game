@@ -188,7 +188,7 @@ function WorldPhase() {
 
           <div className="text-sm font-semibold text-white mb-1">📜 Battle Log</div>
           <div className="flex-1 overflow-y-auto text-xs space-y-1">
-            {actionLog.slice(-50).map((entry, index) => (
+            {[...actionLog.slice(-50)].reverse().map((entry, index) => (
               <div key={index} className="text-gray-400">
                 {entry}
               </div>
