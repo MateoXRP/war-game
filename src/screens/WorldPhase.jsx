@@ -1,3 +1,4 @@
+// src/screens/WorldPhase.jsx
 import { useGame } from "../context/GameContext"
 import WorldMap from "../components/map/WorldMap"
 import { useLog } from "../context/LogContext"
@@ -28,21 +29,10 @@ function WorldPhase() {
 
   useEffect(() => {
     if (isPlacementPhase && currentPlayer?.id === "human") {
-      setUiTroopsLeft(35)
+      const ownedCount = territories.filter(t => t.owner === currentPlayer.id).length
+      setUiTroopsLeft(35 - ownedCount)
     }
-  }, [isPlacementPhase, currentPlayer])
-
-  useEffect(() => {
-    if (isPlacementPhase && currentPlayer?.id === "human") {
-      const playerTerritoriesCount = territories.filter(
-        (t) => t.owner === currentPlayer.id
-      ).length
-      const newTroopsLeft = 35 - playerTerritoriesCount
-      if (newTroopsLeft !== uiTroopsLeft) {
-        setUiTroopsLeft(newTroopsLeft)
-      }
-    }
-  }, [territories, isPlacementPhase, currentPlayer, uiTroopsLeft])
+  }, [territories, isPlacementPhase, currentPlayer])
 
   useEffect(() => {
     if (isTurnPhase) {
@@ -78,6 +68,16 @@ function WorldPhase() {
     setTerritories(cleared)
     setReinforcements((prev) => ({ ...prev, human: 0 }))
     nextTurn()
+  }
+
+  const downloadLog = () => {
+    const element = document.createElement("a")
+    const logText = actionLog.join("\n")
+    const file = new Blob([logText], { type: "text/plain" })
+    element.href = URL.createObjectURL(file)
+    element.download = "battle_log.txt"
+    document.body.appendChild(element)
+    element.click()
   }
 
   if (gameOver) {
@@ -116,6 +116,12 @@ function WorldPhase() {
             className="bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-red-500"
           >
             🚪 Sign Out
+          </button>
+          <button
+            onClick={downloadLog}
+            className="bg-green-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-green-500"
+          >
+            📥 Download Log
           </button>
         </div>
 
@@ -168,6 +174,15 @@ function WorldPhase() {
           <WorldMap />
         </div>
         <div className="w-1/4 bg-gray-900 p-4 border-l border-gray-700 flex flex-col">
+          <div className="text-sm text-gray-300 font-semibold mb-2">
+            Troops Remaining:{" "}
+            {isPlacementPhase
+              ? uiTroopsLeft
+              : (isReinforcementPhase || isTurnPhase) && currentPlayer?.id
+              ? reinforcements[currentPlayer.id] ?? 0
+              : "-"}
+          </div>
+
           {isTurnPhase && currentPlayer?.id === "human" && hasTurnStarted.current && (
             <div className="mb-4 flex flex-col items-center space-y-2 sticky top-0 bg-gray-900 z-10 pt-2">
               <button
@@ -203,12 +218,7 @@ function WorldPhase() {
             </div>
           )}
 
-          <div className="text-sm text-gray-300 font-semibold mb-2">
-            Troops Remaining:{" "}
-            {isPlacementPhase ? uiTroopsLeft : reinforcements[currentPlayer?.id] ?? 0}
-          </div>
-
-          <div className="flex-1 overflow-y-auto space-y-1 pt-4 max-h-[calc(100vh-10rem)]">
+          <div className="flex-1 overflow-y-auto pt-4 space-y-1 max-h-[calc(100vh-10rem)]">
             <h2 className="text-lg font-semibold mb-2">📜 Battle Log</h2>
             {[...actionLog].reverse().map((entry, index) => (
               <div key={index} className="text-sm text-gray-300">
@@ -223,4 +233,3 @@ function WorldPhase() {
 }
 
 export default WorldPhase
-
