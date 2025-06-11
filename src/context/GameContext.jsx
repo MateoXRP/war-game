@@ -10,9 +10,9 @@ import {
 } from "../logic/phaseLogic"
 import { useSelection } from "../hooks/useSelection"
 import { useLog } from "./LogContext"
-
 import { db } from "../firebase"
 import { doc, setDoc, updateDoc, getDoc, increment } from "firebase/firestore"
+import { drawAndCheckCards } from "../logic/cardLogic"
 
 const GameContext = createContext()
 
@@ -33,6 +33,12 @@ export function GameProvider({ children }) {
   const [gameOver, setGameOver] = useState(false)
   const [winner, setWinner] = useState(null)
   const [conqueredThisTurn, setConqueredThisTurn] = useState(false)
+  const [playerCards, setPlayerCards] = useState({
+    human: [],
+    cpu1: [],
+    cpu2: [],
+  })
+  const [setsTurnedIn, setSetsTurnedIn] = useState(0)
 
   const {
     selectedSource,
@@ -49,7 +55,6 @@ export function GameProvider({ children }) {
 
   const nextTurn = () => {
     if (!playerOrder || territories.length === 0) return
-
     setConqueredThisTurn(false)
 
     let nextIndex = turnIndex + 1
@@ -209,7 +214,7 @@ export function GameProvider({ children }) {
 
   function resolveBattle(attackerId, defenderId) {
     const before = territories.find((t) => t.id === defenderId)?.owner
-    battleLogic({
+    const conquered = battleLogic({
       attackerId,
       defenderId,
       territories,
@@ -221,9 +226,29 @@ export function GameProvider({ children }) {
       setSelectedTarget,
     })
     const after = territories.find((t) => t.id === defenderId)?.owner
+
     if (before && after && before !== after && after === currentPlayer.id) {
       setConqueredThisTurn(true)
+
+      const bonus = drawAndCheckCards({
+        playerId: currentPlayer.id,
+        playerCards,
+        setPlayerCards,
+        setsTurnedIn,
+        setSetsTurnedIn,
+        logAction,
+      })
+
+      if (!currentPlayer.isCPU && bonus > 0) {
+        setReinforcements((prev) => ({
+          ...prev,
+          [currentPlayer.id]: (prev[currentPlayer.id] || 0) + bonus,
+        }))
+      } else if (bonus > 0) {
+        logAction(`🧠 ${currentPlayer.name} banked ${bonus} bonus troops for next turn`)
+      }
     }
+
     resetSelection()
   }
 
@@ -248,6 +273,8 @@ export function GameProvider({ children }) {
         logAction,
         gameOver,
         winner,
+        playerCards,
+        setsTurnedIn,
       }}
     >
       {children}
@@ -256,4 +283,3 @@ export function GameProvider({ children }) {
 }
 
 export const useGame = () => useContext(GameContext)
-
