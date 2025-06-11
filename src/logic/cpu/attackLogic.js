@@ -72,14 +72,14 @@ export function handleTurnPhaseLoop({
   }
 
   function startAttackLoop() {
-    logAction?.(`🧠 ${currentPlayer.name} begins attack phase...`)
+    logAction?.(`🔄 ${currentPlayer.name} begins attack phase...`)
 
     const runNextRound = () => {
       const fresh = structuredClone(territories)
       const attacks = getBestAttackSet(fresh)
 
       if (attacks.length === 0) {
-        logAction?.(`✅ ${currentPlayer.name} ends attack phase.`)
+        logAction?.(`🔄 ${currentPlayer.name} ends attack phase.`)
         memory.turnActive = false
         nextTurn()
         return
@@ -128,7 +128,6 @@ export function handleTurnPhaseLoop({
 
         let score = 0
 
-        // Troop comparison logic — prefer stronger but allow equal
         if (from.troops > to.troops) score += 10
         else if (from.troops === to.troops) score += 3
         else score -= 5
@@ -136,6 +135,10 @@ export function handleTurnPhaseLoop({
         if (priorityContinents.has(to.continent)) score += 5
         score += Math.max(0, 5 - to.troops)
         if (to.owner === "human") score += 15
+
+        logAction?.(
+          `🧠 Considering ${from.name} (${from.troops}) → ${to.name} (${to.troops}) | Score: ${score}`
+        )
 
         allAttacks.push({ from: from.id, to: to.id, score })
       }
@@ -165,13 +168,8 @@ export function handleTurnPhaseLoop({
       }
 
       const { from, to } = attacks[index]
-
-      console.log(
-        `🪖 ${currentPlayer.name} attacks from ${from} → ${to}`
-      )
-
+      logAction?.(`🪖 ${currentPlayer.name} attacks from ${from} → ${to}`)
       resolveBattle(from, to)
-
       setTimeout(() => perform(index + 1), 350)
     }
 

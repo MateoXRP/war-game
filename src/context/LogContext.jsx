@@ -6,8 +6,8 @@ const LogContext = createContext()
 export function LogProvider({ children }) {
   const [actionLog, setActionLog] = useState([])
 
-  function logAction(message) {
-    setActionLog((prev) => [...prev.slice(-49), message])
+  const logAction = (entry) => {
+    setActionLog((prev) => [...prev, entry])
   }
 
   return (
@@ -18,4 +18,3 @@ export function LogProvider({ children }) {
 }
 
 export const useLog = () => useContext(LogContext)
-
