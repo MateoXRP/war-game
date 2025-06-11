@@ -26,6 +26,14 @@ function WorldPhase() {
   const [leaderboard, setLeaderboard] = useState([])
   const [confirmSurrender, setConfirmSurrender] = useState(false)
   const [uiTroopsLeft, setUiTroopsLeft] = useState(35)
+  const [secondsElapsed, setSecondsElapsed] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!gameOver) setSecondsElapsed((prev) => prev + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [gameOver])
 
   useEffect(() => {
     if (isPlacementPhase && currentPlayer?.id === "human") {
@@ -46,7 +54,7 @@ function WorldPhase() {
         try {
           const q = query(
             collection(db, "war_leaderboard"),
-            orderBy("wins", "desc"),
+            orderBy("bestTime", "asc"),
             limit(10)
           )
           const snapshot = await getDocs(q)
@@ -80,6 +88,12 @@ function WorldPhase() {
     element.click()
   }
 
+  const formatTime = (secs) => {
+    const mins = Math.floor(secs / 60)
+    const seconds = secs % 60
+    return `${mins}:${seconds.toString().padStart(2, "0")}`
+  }
+
   if (gameOver) {
     const isVictory = winner?.id === "human"
     const playerName = localStorage.getItem("playerName")
@@ -100,29 +114,14 @@ function WorldPhase() {
         </h1>
         <p className="text-lg text-gray-300">
           {isVictory
-            ? "You conquered the world!"
+            ? `You conquered the world in ${formatTime(secondsElapsed)}!`
             : `You were eliminated by ${winner?.name}.`}
         </p>
 
         <div className="flex space-x-4">
-          <button
-            onClick={handleRestart}
-            className="bg-yellow-500 text-black font-semibold py-2 px-6 rounded-2xl shadow hover:bg-yellow-400"
-          >
-            🔁 Restart
-          </button>
-          <button
-            onClick={handleSignOut}
-            className="bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-red-500"
-          >
-            🚪 Sign Out
-          </button>
-          <button
-            onClick={downloadLog}
-            className="bg-green-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-green-500"
-          >
-            📥 Download Log
-          </button>
+          <button onClick={handleRestart} className="bg-yellow-500 text-black font-semibold py-2 px-6 rounded-2xl shadow hover:bg-yellow-400">🔁 Restart</button>
+          <button onClick={handleSignOut} className="bg-red-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-red-500">🚪 Sign Out</button>
+          <button onClick={downloadLog} className="bg-green-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-green-500">📥 Download Log</button>
         </div>
 
         {leaderboard.length > 0 && (
@@ -133,8 +132,8 @@ function WorldPhase() {
                 <tr>
                   <th className="px-2 py-1">#</th>
                   <th className="px-2 py-1">Name</th>
-                  <th className="px-2 py-1">Wins</th>
-                  <th className="px-2 py-1">Losses</th>
+                  <th className="px-2 py-1">Best Time</th>
+                  <th className="px-2 py-1">W/L</th>
                 </tr>
               </thead>
               <tbody>
@@ -142,8 +141,8 @@ function WorldPhase() {
                   <tr key={player.name} className="border-t border-gray-700">
                     <td className="px-2 py-1">{index + 1}</td>
                     <td className="px-2 py-1">{player.name}</td>
-                    <td className="px-2 py-1">{player.wins}</td>
-                    <td className="px-2 py-1">{player.losses}</td>
+                    <td className="px-2 py-1">{formatTime(player.bestTime || 0)}</td>
+                    <td className="px-2 py-1">{player.wins}/{player.losses}</td>
                   </tr>
                 ))}
               </tbody>
@@ -158,14 +157,10 @@ function WorldPhase() {
     <div className="flex flex-col min-h-screen bg-background text-white">
       <div className="flex justify-between items-center px-6 py-4 bg-gray-800 shadow">
         <div className="text-lg font-semibold">
-          🌍 War Game {isPlacementPhase
-            ? "📦 Placement Phase"
-            : isReinforcementPhase
-            ? "➕ Reinforcement Phase"
-            : "⚔️ Turn Phase"}
+          🌍 War Game {isPlacementPhase ? "📦 Placement Phase" : isReinforcementPhase ? "➕ Reinforcement Phase" : "⚔️ Turn Phase"}
         </div>
         <div className="text-sm text-gray-300">
-          Current Turn: {currentPlayer?.name || "Loading..."}
+          Current Turn: {currentPlayer?.name || "Loading..."} ⏱ {formatTime(secondsElapsed)}
         </div>
       </div>
 
@@ -173,6 +168,7 @@ function WorldPhase() {
         <div className="flex-grow min-h-0">
           <WorldMap />
         </div>
+
         <div className="w-1/4 bg-gray-900 p-4 border-l border-gray-700 flex flex-col">
           <div className="text-sm text-gray-300 font-semibold mb-2">
             Troops Remaining: {isPlacementPhase
@@ -187,31 +183,17 @@ function WorldPhase() {
               <button
                 onClick={nextTurn}
                 className="w-full bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-green-500"
-              >
-                ✅ End Turn
-              </button>
+              >✅ End Turn</button>
               {!confirmSurrender ? (
                 <button
                   onClick={() => setConfirmSurrender(true)}
                   className="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-red-500"
-                >
-                  🏳️ Surrender
-                </button>
+                >🏳️ Surrender</button>
               ) : (
                 <div className="flex space-x-2 mt-2">
                   <span>Are you sure?</span>
-                  <button
-                    onClick={handleSurrender}
-                    className="bg-red-700 text-white font-semibold px-3 rounded"
-                  >
-                    ✅ Yes
-                  </button>
-                  <button
-                    onClick={() => setConfirmSurrender(false)}
-                    className="bg-gray-700 text-white font-semibold px-3 rounded"
-                  >
-                    ❌ No
-                  </button>
+                  <button onClick={handleSurrender} className="bg-red-700 text-white font-semibold px-3 rounded">✅ Yes</button>
+                  <button onClick={() => setConfirmSurrender(false)} className="bg-gray-700 text-white font-semibold px-3 rounded">❌ No</button>
                 </div>
               )}
             </div>

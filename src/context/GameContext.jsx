@@ -39,6 +39,8 @@ export function GameProvider({ children }) {
     cpu2: [],
   })
   const [setsTurnedIn, setSetsTurnedIn] = useState(0)
+  const [startTime, setStartTime] = useState(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   const {
     selectedSource,
@@ -113,8 +115,21 @@ export function GameProvider({ children }) {
         initialReinforcements[p.id] = 35
       })
       setReinforcements(initialReinforcements)
+
+      setStartTime(Date.now())
+      setElapsedSeconds(0)
     }
   }, [])
+
+  useEffect(() => {
+    if (!startTime || gameOver) return
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [startTime, gameOver])
 
   useEffect(() => {
     handlePlacementToReinforcement({
@@ -275,6 +290,7 @@ export function GameProvider({ children }) {
         winner,
         playerCards,
         setsTurnedIn,
+        elapsedSeconds,
       }}
     >
       {children}
