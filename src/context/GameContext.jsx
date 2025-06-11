@@ -87,16 +87,28 @@ export function GameProvider({ children }) {
 
     try {
       const snap = await getDoc(statsRef)
-      if (!snap.exists()) {
+      const existing = snap.exists() ? snap.data() : null
+
+      if (!existing) {
         await setDoc(statsRef, {
           name: playerName,
           wins: outcome === "win" ? 1 : 0,
           losses: outcome === "loss" ? 1 : 0,
+          bestTime: outcome === "win" ? elapsedSeconds : null,
         })
       } else {
-        await updateDoc(statsRef, {
+        const updates = {
           [outcome === "win" ? "wins" : "losses"]: increment(1),
-        })
+        }
+
+        if (outcome === "win") {
+          const oldBest = existing.bestTime
+          if (!oldBest || elapsedSeconds < oldBest) {
+            updates.bestTime = elapsedSeconds
+          }
+        }
+
+        await updateDoc(statsRef, updates)
       }
     } catch (err) {
       console.error("Failed to record game result:", err)

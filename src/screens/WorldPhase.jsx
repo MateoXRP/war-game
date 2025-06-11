@@ -19,6 +19,7 @@ function WorldPhase() {
     nextTurn,
     gameOver,
     winner,
+    elapsedSeconds,
   } = useGame()
 
   const { actionLog } = useLog()
@@ -26,14 +27,6 @@ function WorldPhase() {
   const [leaderboard, setLeaderboard] = useState([])
   const [confirmSurrender, setConfirmSurrender] = useState(false)
   const [uiTroopsLeft, setUiTroopsLeft] = useState(35)
-  const [secondsElapsed, setSecondsElapsed] = useState(0)
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (!gameOver) setSecondsElapsed((prev) => prev + 1)
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [gameOver])
 
   useEffect(() => {
     if (isPlacementPhase && currentPlayer?.id === "human") {
@@ -114,7 +107,7 @@ function WorldPhase() {
         </h1>
         <p className="text-lg text-gray-300">
           {isVictory
-            ? `You conquered the world in ${formatTime(secondsElapsed)}!`
+            ? `You conquered the world in ${formatTime(elapsedSeconds)}!`
             : `You were eliminated by ${winner?.name}.`}
         </p>
 
@@ -124,7 +117,7 @@ function WorldPhase() {
           <button onClick={downloadLog} className="bg-green-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-green-500">📥 Download Log</button>
         </div>
 
-        {leaderboard.length > 0 && (
+        {isVictory && leaderboard.length > 0 && (
           <div className="mt-8 w-full max-w-md">
             <h2 className="text-xl font-semibold mb-2 text-center">🏆 Leaderboard</h2>
             <table className="w-full text-sm text-left text-white border border-gray-600">
@@ -160,7 +153,7 @@ function WorldPhase() {
           🌍 War Game {isPlacementPhase ? "📦 Placement Phase" : isReinforcementPhase ? "➕ Reinforcement Phase" : "⚔️ Turn Phase"}
         </div>
         <div className="text-sm text-gray-300">
-          Current Turn: {currentPlayer?.name || "Loading..."} ⏱ {formatTime(secondsElapsed)}
+          Current Turn: {currentPlayer?.name || "Loading..."} ⏱ {formatTime(elapsedSeconds)}
         </div>
       </div>
 
