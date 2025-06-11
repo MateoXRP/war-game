@@ -36,12 +36,26 @@ export function handleTurnPhaseLoop({
 
   function placeTurnTroop() {
     const owned = territories.filter((t) => t.owner === currentPlayer.id)
-    const frontline = owned.filter((t) =>
-      isAdjacentToEnemy(t.id, territories, currentPlayer.id)
+
+    // Prioritize territories adjacent to human-controlled ones
+    const priorityTargets = owned.filter((t) =>
+      (adjacencyMap[t.id] || []).some((neighborId) => {
+        const neighbor = territories.find((x) => x.id === neighborId)
+        return neighbor && neighbor.owner === "human"
+      })
     )
 
-    let targets = frontline
+    let targets = priorityTargets
 
+    // Fallback to normal frontline logic
+    if (targets.length === 0) {
+      const frontline = owned.filter((t) =>
+        isAdjacentToEnemy(t.id, territories, currentPlayer.id)
+      )
+      targets = frontline
+    }
+
+    // Fallback to connector tiles in preferred continent
     if (targets.length === 0) {
       const preferredContinent = memory.continent
       const inContinent = owned.filter((t) => t.continent === preferredContinent)
@@ -49,6 +63,7 @@ export function handleTurnPhaseLoop({
       targets = inContinent.filter((t) => connectorIds.includes(t.id))
     }
 
+    // Final fallback to any owned tile
     if (targets.length === 0) {
       targets = owned
     }
@@ -75,7 +90,7 @@ export function handleTurnPhaseLoop({
     logAction?.(`🔄 ${currentPlayer.name} begins attack phase...`)
 
     const runNextRound = () => {
-      const fresh = structuredClone(territories) // ✅ Now using updated territories each round
+      const fresh = structuredClone(territories)
       const attacks = getBestAttackSet(fresh)
 
       if (attacks.length === 0) {
@@ -123,12 +138,9 @@ export function handleTurnPhaseLoop({
 
       for (const neighborId of neighbors) {
         const to = currentTerritories.find((t) => t.id === neighborId)
-        if (!to || !to.owner || to.owner === currentPlayer.id) {
-          continue
-        }
+        if (!to || !to.owner || to.owner === currentPlayer.id) continue
 
         let score = 0
-
         if (from.troops > to.troops) score += 10
         else if (from.troops === to.troops) score += 3
         else score -= 5
@@ -173,10 +185,10 @@ export function handleTurnPhaseLoop({
       const defender = currentTerritories.find((t) => t.id === to)
 
       logAction?.(`🧾 CPU sees: ${attacker.name} (${attacker?.troops}) → ${defender.name} (${defender?.troops})`)
-      logAction?.(`🪖 ${currentPlayer.name} attacks from ${attacker.name} → ${defender.name}`)
+      logAction?.(`🧠 Executing attack from ${from} to ${to}`)
 
       resolveBattle(from, to)
-      setTimeout(() => perform(index + 1), 350)
+      setTimeout(() => perform(index + 1), 400)
     }
 
     perform()
