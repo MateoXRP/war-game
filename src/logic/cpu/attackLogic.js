@@ -75,17 +75,18 @@ export function handleTurnPhaseLoop({
     logAction?.(`🔄 ${currentPlayer.name} begins attack phase...`)
 
     const runNextRound = () => {
-      const fresh = structuredClone(territories)
+      const fresh = structuredClone(territories) // ✅ Now using updated territories each round
       const attacks = getBestAttackSet(fresh)
 
       if (attacks.length === 0) {
+        logAction?.(`🧠 No viable attacks found for ${currentPlayer.name}`)
         logAction?.(`🔄 ${currentPlayer.name} ends attack phase.`)
         memory.turnActive = false
         nextTurn()
         return
       }
 
-      executeAttackSet(attacks, () => {
+      executeAttackSet(attacks, fresh, resolveBattle, () => {
         setTimeout(runNextRound, 400)
       })
     }
@@ -160,7 +161,7 @@ export function handleTurnPhaseLoop({
     return attacksToPerform
   }
 
-  function executeAttackSet(attacks, onComplete) {
+  function executeAttackSet(attacks, currentTerritories, resolveBattle, onComplete) {
     function perform(index = 0) {
       if (index >= attacks.length) {
         onComplete()
@@ -168,7 +169,12 @@ export function handleTurnPhaseLoop({
       }
 
       const { from, to } = attacks[index]
-      logAction?.(`🪖 ${currentPlayer.name} attacks from ${from} → ${to}`)
+      const attacker = currentTerritories.find((t) => t.id === from)
+      const defender = currentTerritories.find((t) => t.id === to)
+
+      logAction?.(`🧾 CPU sees: ${attacker.name} (${attacker?.troops}) → ${defender.name} (${defender?.troops})`)
+      logAction?.(`🪖 ${currentPlayer.name} attacks from ${attacker.name} → ${defender.name}`)
+
       resolveBattle(from, to)
       setTimeout(() => perform(index + 1), 350)
     }
