@@ -1,7 +1,7 @@
 // src/logic/cardLogic.js
 
 // Expanded set of unique card flags
-const FLAGS = ["🇺🇸", "🇨🇳", "🇷🇺", "🇬🇧", "🇧🇷", "🇫🇷", "🇯🇵", "🇩🇪", "🇮🇳"]
+const FLAGS = ["🇺🇸", "🇨🇳", "🇷🇺", "🇬🇧", "🇧🇷", "🇫🇷", "🇯🇵", "🇩🇪", "🇮🇳","🇰🇷", "🇲🇽", "🇮🇹", "🇪🇸", "🇨🇦"]
 
 function getRandomFlag() {
   return FLAGS[Math.floor(Math.random() * FLAGS.length)]
