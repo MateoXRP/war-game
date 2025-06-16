@@ -18,25 +18,39 @@ export function handleReinforcementLoop({
 
   const owned = territories.filter((t) => t.owner === currentPlayer.id)
 
-  const priorityTargets = owned.filter((t) =>
+  // Priority 1: territories adjacent to human player
+  const priority1 = owned.filter((t) =>
     (adjacencyMap[t.id] || []).some((neighborId) => {
       const neighbor = territories.find((x) => x.id === neighborId)
       return neighbor && neighbor.owner === "human"
     })
   )
 
-  let targets = priorityTargets
+  // Priority 2: territories adjacent to other CPU
+  const priority2 = owned.filter((t) =>
+    (adjacencyMap[t.id] || []).some((neighborId) => {
+      const neighbor = territories.find((x) => x.id === neighborId)
+      return (
+        neighbor &&
+        neighbor.owner !== currentPlayer.id &&
+        neighbor.owner?.startsWith("cpu")
+      )
+    })
+  )
 
-  if (targets.length === 0) {
-    const preferredContinent = memory.continent
-    const inContinent = owned.filter((t) => t.continent === preferredContinent)
-    const connectorIds = entryPointsByContinent[preferredContinent] || []
-    targets = inContinent.filter((t) => connectorIds.includes(t.id))
-  }
+  // Priority 3: connector tiles in preferred continent
+  const preferredContinent = memory.continent
+  const inContinent = owned.filter((t) => t.continent === preferredContinent)
+  const connectorIds = entryPointsByContinent[preferredContinent] || []
+  const priority3 = inContinent.filter((t) => connectorIds.includes(t.id))
 
-  if (targets.length === 0) {
-    targets = owned
-  }
+  let targets = priority1.length
+    ? priority1
+    : priority2.length
+    ? priority2
+    : priority3.length
+    ? priority3
+    : owned
 
   const index = memory.reinforceIndex % targets.length
   const target = targets[index]
@@ -55,6 +69,6 @@ export function handleReinforcementLoop({
     [currentPlayer.id]: prev[currentPlayer.id] - 1,
   }))
 
-  // ✅ Immediately end turn after placing one troop
+  // ✅ One troop per CPU per round, like the human player
   nextTurn()
 }
