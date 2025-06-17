@@ -9,7 +9,7 @@ export function handleTurnPhaseLoop({
   nextTurn,
   reinforcements,
   setReinforcements,
-  resolveBattle,
+  resolveBattle, // ✅ This is the wrapper function passed in, NOT imported directly
   memory,
   logAction,
 }) {
