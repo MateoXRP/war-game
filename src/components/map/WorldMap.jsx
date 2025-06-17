@@ -164,9 +164,8 @@ function WorldMap() {
         const midX = (a.x + b.x) / 2 + 60
         const midY = (a.y + b.y) / 2 + 50
         return (
-          <>
+          <g key={`line-${index}`}>
             <line
-              key={`${index}-a`}
               x1={(a.x + 60 + midX) / 2}
               y1={(a.y + 50 + midY) / 2}
               x2={midX}
@@ -175,7 +174,6 @@ function WorldMap() {
               strokeWidth="3"
             />
             <line
-              key={`${index}-b`}
               x1={(b.x + 60 + midX) / 2}
               y1={(b.y + 50 + midY) / 2}
               x2={midX}
@@ -183,7 +181,7 @@ function WorldMap() {
               stroke="yellow"
               strokeWidth="3"
             />
-          </>
+          </g>
         )
       })}
 
@@ -288,4 +286,3 @@ function WorldMap() {
 }
 
 export default WorldMap
-

@@ -1,0 +1,83 @@
+{
+  "name": "War Game",
+  "short_name": "WarGame",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "landscape",
+  "scope": ".",
+  "icons": [
+    {
+      "src": "/icon-20x20.png",
+      "sizes": "20x20",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-29x29.png",
+      "sizes": "29x29",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-40x40.png",
+      "sizes": "40x40",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-58x58.png",
+      "sizes": "58x58",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-60x60.png",
+      "sizes": "60x60",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-76x76.png",
+      "sizes": "76x76",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-80x80.png",
+      "sizes": "80x80",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-84x84.png",
+      "sizes": "84x84",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-87x87.png",
+      "sizes": "87x87",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-120x120.png",
+      "sizes": "120x120",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-167x167.png",
+      "sizes": "167x167",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-1024x1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

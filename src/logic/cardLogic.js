@@ -29,7 +29,6 @@ const FLAGS = [
   "🇵🇰"  // Pakistan
 ]
 
-
 function getRandomFlag() {
   return FLAGS[Math.floor(Math.random() * FLAGS.length)]
 }
@@ -49,7 +48,7 @@ export function drawAndCheckCards({
   const match = findMatch(updated)
 
   if (match) {
-    logAction(`🎖️ ${playerId} matched 3 ${match} cards!`)
+    logAction(`🎖️ ${playerId} matched 2 ${match} cards!`)
     const remaining = removeThreeMatchingCards(updated, match)
     const bonus = calculateBonus(setsTurnedIn)
     logAction(`➕ ${playerId} earned ${bonus} bonus troops!`)
@@ -68,7 +67,7 @@ function findMatch(cards) {
   const count = {}
   for (const c of cards) {
     count[c] = (count[c] || 0) + 1
-    if (count[c] >= 3) return c  // 🔼 Match threshold increased to 3
+    if (count[c] >= 2) return c
   }
   return null
 }
@@ -76,7 +75,7 @@ function findMatch(cards) {
 function removeThreeMatchingCards(cards, match) {
   let removed = 0
   return cards.filter((c) => {
-    if (c === match && removed < 3) {
+    if (c === match && removed < 2) {
       removed++
       return false
     }
@@ -85,5 +84,6 @@ function removeThreeMatchingCards(cards, match) {
 }
 
 function calculateBonus(sets) {
-  return 4 + sets * 2
+  const bonusTable = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+  return bonusTable[Math.min(sets, bonusTable.length - 1)]
 }

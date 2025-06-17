@@ -6,16 +6,12 @@ export function resolveBattle({
   defenderId,
   territories,
   currentPlayer,
-  playerOrder,
   logAction,
-  setTerritories,
-  setSelectedSource,
-  setSelectedTarget,
 }) {
   const attacker = territories.find((t) => t.id === attackerId)
   const defender = territories.find((t) => t.id === defenderId)
 
-  if (!attacker || !defender) return false
+  if (!attacker || !defender) return { updatedTerritories: territories, conquered: false }
 
   const attackDice = []
   const defendDice = []
@@ -66,9 +62,11 @@ export function resolveBattle({
     conquered = true
   }
 
-  setTerritories([...territories])
-  setSelectedSource(null)
-  setSelectedTarget(null)
+  const updatedTerritories = territories.map((t) => {
+    if (t.id === attacker.id) return { ...attacker }
+    if (t.id === defender.id) return { ...defender }
+    return t
+  })
 
-  return conquered
+  return { updatedTerritories, conquered }
 }

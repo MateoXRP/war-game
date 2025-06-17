@@ -1,6 +1,7 @@
 // src/logic/cpu/attackLogic.js
 import { adjacencyMap, entryPointsByContinent } from "../../data/territoryGraph"
 import { isAdjacentToEnemy } from "./utils"
+import { resolveBattle } from "../battleLogic"
 
 export function handleTurnPhaseLoop({
   territories,
@@ -9,7 +10,7 @@ export function handleTurnPhaseLoop({
   nextTurn,
   reinforcements,
   setReinforcements,
-  resolveBattle, // ✅ This is the wrapper function passed in, NOT imported directly
+  resolveBattle: unused,
   memory,
   logAction,
 }) {
@@ -22,7 +23,10 @@ export function handleTurnPhaseLoop({
     const interval = setInterval(() => {
       if (remaining <= 0) {
         clearInterval(interval)
-        startAttackLoop()
+        setTerritories((latest) => {
+          setTimeout(() => startAttackLoop(latest), 0)
+          return latest
+        })
       } else {
         placeTurnTroop()
         remaining -= 1
@@ -32,12 +36,11 @@ export function handleTurnPhaseLoop({
     return
   }
 
-  startAttackLoop()
+  setTimeout(() => startAttackLoop(territories), 0)
 
   function placeTurnTroop() {
     const owned = territories.filter((t) => t.owner === currentPlayer.id)
 
-    // Priority 1: adjacent to human
     const priority1 = owned.filter((t) =>
       (adjacencyMap[t.id] || []).some((neighborId) => {
         const neighbor = territories.find((x) => x.id === neighborId)
@@ -45,7 +48,6 @@ export function handleTurnPhaseLoop({
       })
     )
 
-    // Priority 2: adjacent to other CPU
     const priority2 = owned.filter((t) =>
       (adjacencyMap[t.id] || []).some((neighborId) => {
         const neighbor = territories.find((x) => x.id === neighborId)
@@ -57,7 +59,6 @@ export function handleTurnPhaseLoop({
       })
     )
 
-    // Priority 3: connector tiles in preferred continent
     const preferredContinent = memory.continent
     const inContinent = owned.filter((t) => t.continent === preferredContinent)
     const connectorIds = entryPointsByContinent[preferredContinent] || []
@@ -89,27 +90,25 @@ export function handleTurnPhaseLoop({
     }))
   }
 
-  function startAttackLoop() {
+  function startAttackLoop(current) {
     logAction?.(`🔄 ${currentPlayer.name} begins attack phase...`)
 
-    const runNextRound = () => {
-      const fresh = structuredClone(territories)
-      const attacks = getBestAttackSet(fresh)
+    const runNextRound = (freshTerritories) => {
+      const attacks = getBestAttackSet(freshTerritories)
 
       if (attacks.length === 0) {
         logAction?.(`🧠 No viable attacks found for ${currentPlayer.name}`)
         logAction?.(`🔄 ${currentPlayer.name} ends attack phase.`)
         memory.turnActive = false
+        setTerritories(freshTerritories)
         nextTurn()
         return
       }
 
-      executeAttackSet(attacks, fresh, resolveBattle, () => {
-        setTimeout(runNextRound, 400)
-      })
+      executeAttackSet(attacks, freshTerritories, runNextRound)
     }
 
-    runNextRound()
+    runNextRound(current)
   }
 
   function getBestAttackSet(currentTerritories) {
@@ -176,24 +175,36 @@ export function handleTurnPhaseLoop({
     return attacksToPerform
   }
 
-  function executeAttackSet(attacks, currentTerritories, resolveBattle, onComplete) {
-    function perform(index = 0) {
+  function executeAttackSet(attacks, currentTerritories, callback) {
+    let index = 0
+
+    function performRound(freshTerritories) {
       if (index >= attacks.length) {
-        onComplete()
+        callback(freshTerritories)
         return
       }
 
       const { from, to } = attacks[index]
-      const attacker = currentTerritories.find((t) => t.id === from)
-      const defender = currentTerritories.find((t) => t.id === to)
+      const attacker = freshTerritories.find((t) => t.id === from)
+      const defender = freshTerritories.find((t) => t.id === to)
 
-      logAction?.(`🧾 CPU sees: ${attacker.name} (${attacker?.troops}) → ${defender.name} (${defender?.troops})`)
-      logAction?.(`🧠 Executing attack from ${from} to ${to}`)
+     // logAction?.(`🧾 CPU sees: ${attacker.name} (${attacker?.troops}) → ${defender.name} (${defender?.troops})`)
+     // logAction?.(`🧠 Executing attack from ${from} to ${to}`)
 
-      resolveBattle(from, to)
-      setTimeout(() => perform(index + 1), 400)
+      const { updatedTerritories } = resolveBattle({
+        attackerId: from,
+        defenderId: to,
+        territories: freshTerritories,
+        currentPlayer,
+        logAction,
+      })
+
+      setTimeout(() => {
+        index++
+        performRound(updatedTerritories)
+      }, 400)
     }
 
-    perform()
+    performRound(currentTerritories)
   }
 }
