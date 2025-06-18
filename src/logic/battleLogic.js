@@ -52,7 +52,10 @@ export function resolveBattle({
 
   if (defender.troops <= 0) {
     defender.owner = attacker.owner
-    const moveIn = attackDice.length
+
+    let moveIn = Math.min(attacker.troops - 1, attackDice.length)
+    if (moveIn <= 0) moveIn = 1
+
     defender.troops = moveIn
     attacker.troops -= moveIn
 

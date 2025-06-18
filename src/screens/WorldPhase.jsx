@@ -117,7 +117,7 @@ function WorldPhase() {
           <button onClick={downloadLog} className="bg-green-600 text-white font-semibold py-2 px-6 rounded-2xl shadow hover:bg-green-500">📥 Download Log</button>
         </div>
 
-        {isVictory && leaderboard.length > 0 && (
+        {leaderboard.length > 0 && (
           <div className="mt-8 w-full max-w-md">
             <h2 className="text-xl font-semibold mb-2 text-center">🏆 Leaderboard</h2>
             <table className="w-full text-sm text-left text-white border border-gray-600">

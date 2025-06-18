@@ -17,16 +17,16 @@ export function handleTurnPhaseLoop({
   if (memory.turnActive) return
   memory.turnActive = true
 
+  // Clone territories for local mutation
+  let workingTerritories = [...territories]
+
   if (reinforcements[currentPlayer.id] > 0) {
     let remaining = reinforcements[currentPlayer.id]
 
     const interval = setInterval(() => {
       if (remaining <= 0) {
         clearInterval(interval)
-        setTerritories((latest) => {
-          setTimeout(() => startAttackLoop(latest), 0)
-          return latest
-        })
+        setTimeout(() => startAttackLoop(workingTerritories), 0)
       } else {
         placeTurnTroop()
         remaining -= 1
@@ -36,21 +36,21 @@ export function handleTurnPhaseLoop({
     return
   }
 
-  setTimeout(() => startAttackLoop(territories), 0)
+  setTimeout(() => startAttackLoop(workingTerritories), 0)
 
   function placeTurnTroop() {
-    const owned = territories.filter((t) => t.owner === currentPlayer.id)
+    const owned = workingTerritories.filter((t) => t.owner === currentPlayer.id)
 
     const priority1 = owned.filter((t) =>
       (adjacencyMap[t.id] || []).some((neighborId) => {
-        const neighbor = territories.find((x) => x.id === neighborId)
-        return neighbor && neighbor.owner === "human"
+        const neighbor = workingTerritories.find((x) => x.id === neighborId)
+        return neighbor && neighbor.owner && neighbor.owner !== currentPlayer.id
       })
     )
 
     const priority2 = owned.filter((t) =>
       (adjacencyMap[t.id] || []).some((neighborId) => {
-        const neighbor = territories.find((x) => x.id === neighborId)
+        const neighbor = workingTerritories.find((x) => x.id === neighborId)
         return (
           neighbor &&
           neighbor.owner !== currentPlayer.id &&
@@ -76,10 +76,9 @@ export function handleTurnPhaseLoop({
     const target = targets[index]
     memory.reinforceIndex++
 
-    setTerritories((prev) =>
-      prev.map((t) =>
-        t.id === target.id ? { ...t, troops: t.troops + 1 } : t
-      )
+    // Modify workingTerritories directly instead of using setTerritories
+    workingTerritories = workingTerritories.map((t) =>
+      t.id === target.id ? { ...t, troops: t.troops + 1 } : t
     )
 
     logAction?.(`➕ ${currentPlayer.name} reinforced ${target.name}`)
@@ -91,21 +90,17 @@ export function handleTurnPhaseLoop({
   }
 
   function startAttackLoop(current) {
-    logAction?.(`🔄 ${currentPlayer.name} begins attack phase...`)
-
-    const runNextRound = (freshTerritories) => {
-      const attacks = getBestAttackSet(freshTerritories)
+    const runNextRound = (territoriesSnapshot) => {
+      const attacks = getBestAttackSet(territoriesSnapshot)
 
       if (attacks.length === 0) {
-        logAction?.(`🧠 No viable attacks found for ${currentPlayer.name}`)
-        logAction?.(`🔄 ${currentPlayer.name} ends attack phase.`)
         memory.turnActive = false
-        setTerritories(freshTerritories)
+        setTerritories(territoriesSnapshot)
         nextTurn()
         return
       }
 
-      executeAttackSet(attacks, freshTerritories, runNextRound)
+      executeAttackSet(attacks, territoriesSnapshot, runNextRound)
     }
 
     runNextRound(current)
@@ -151,10 +146,6 @@ export function handleTurnPhaseLoop({
         score += Math.max(0, 5 - to.troops)
         if (to.owner === "human") score += 15
 
-        logAction?.(
-          `🧠 Considering ${from.name} (${from.troops}) → ${to.name} (${to.troops}) | Score: ${score}`
-        )
-
         allAttacks.push({ from: from.id, to: to.id, score })
       }
     }
@@ -178,33 +169,27 @@ export function handleTurnPhaseLoop({
   function executeAttackSet(attacks, currentTerritories, callback) {
     let index = 0
 
-    function performRound(freshTerritories) {
+    function next() {
       if (index >= attacks.length) {
-        callback(freshTerritories)
+        setTerritories(currentTerritories)
+        callback(currentTerritories)
         return
       }
 
-      const { from, to } = attacks[index]
-      const attacker = freshTerritories.find((t) => t.id === from)
-      const defender = freshTerritories.find((t) => t.id === to)
-
-     // logAction?.(`🧾 CPU sees: ${attacker.name} (${attacker?.troops}) → ${defender.name} (${defender?.troops})`)
-     // logAction?.(`🧠 Executing attack from ${from} to ${to}`)
-
-      const { updatedTerritories } = resolveBattle({
-        attackerId: from,
-        defenderId: to,
-        territories: freshTerritories,
+      const attack = attacks[index++]
+      const result = resolveBattle({
+        attackerId: attack.from,
+        defenderId: attack.to,
+        territories: currentTerritories,
         currentPlayer,
         logAction,
       })
 
-      setTimeout(() => {
-        index++
-        performRound(updatedTerritories)
-      }, 400)
+      currentTerritories = result.updatedTerritories
+
+      setTimeout(next, 400)
     }
 
-    performRound(currentTerritories)
+    next()
   }
 }

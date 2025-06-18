@@ -84,6 +84,6 @@ function removeThreeMatchingCards(cards, match) {
 }
 
 function calculateBonus(sets) {
-  const bonusTable = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+  const bonusTable = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   return bonusTable[Math.min(sets, bonusTable.length - 1)]
 }
