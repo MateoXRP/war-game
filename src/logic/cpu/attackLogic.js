@@ -17,77 +17,72 @@ export function handleTurnPhaseLoop({
   if (memory.turnActive) return
   memory.turnActive = true
 
-  // Clone territories for local mutation
-  let workingTerritories = [...territories]
-
   if (reinforcements[currentPlayer.id] > 0) {
     let remaining = reinforcements[currentPlayer.id]
+    let updatedTerritories = [...territories]
+
+    const placeTurnTroop = () => {
+      const owned = updatedTerritories.filter((t) => t.owner === currentPlayer.id)
+
+      const priority1 = owned.filter((t) =>
+        (adjacencyMap[t.id] || []).some((neighborId) => {
+          const neighbor = updatedTerritories.find((x) => x.id === neighborId)
+          return neighbor && neighbor.owner && neighbor.owner !== currentPlayer.id
+        })
+      )
+
+      const priority2 = owned.filter((t) =>
+        (adjacencyMap[t.id] || []).some((neighborId) => {
+          const neighbor = updatedTerritories.find((x) => x.id === neighborId)
+          return (
+            neighbor &&
+            neighbor.owner !== currentPlayer.id &&
+            neighbor.owner?.startsWith("cpu")
+          )
+        })
+      )
+
+      const preferredContinent = memory.continent
+      const inContinent = owned.filter((t) => t.continent === preferredContinent)
+      const connectorIds = entryPointsByContinent[preferredContinent] || []
+      const priority3 = inContinent.filter((t) => connectorIds.includes(t.id))
+
+      const targets =
+        priority1.length > 0 ? priority1 :
+        priority2.length > 0 ? priority2 :
+        priority3.length > 0 ? priority3 :
+        owned
+
+      const index = memory.reinforceIndex % targets.length
+      const target = targets[index]
+      memory.reinforceIndex++
+
+      updatedTerritories = updatedTerritories.map((t) =>
+        t.id === target.id ? { ...t, troops: t.troops + 1 } : t
+      )
+
+      logAction?.(`➕ ${currentPlayer.name} reinforced ${target.name}`)
+
+      setReinforcements((prev) => ({
+        ...prev,
+        [currentPlayer.id]: prev[currentPlayer.id] - 1,
+      }))
+    }
 
     const interval = setInterval(() => {
       if (remaining <= 0) {
         clearInterval(interval)
-        setTimeout(() => startAttackLoop(workingTerritories), 0)
+        setTimeout(() => startAttackLoop(updatedTerritories), 0)
       } else {
         placeTurnTroop()
-        remaining -= 1
+        remaining--
       }
     }, 250)
 
     return
   }
 
-  setTimeout(() => startAttackLoop(workingTerritories), 0)
-
-  function placeTurnTroop() {
-    const owned = workingTerritories.filter((t) => t.owner === currentPlayer.id)
-
-    const priority1 = owned.filter((t) =>
-      (adjacencyMap[t.id] || []).some((neighborId) => {
-        const neighbor = workingTerritories.find((x) => x.id === neighborId)
-        return neighbor && neighbor.owner && neighbor.owner !== currentPlayer.id
-      })
-    )
-
-    const priority2 = owned.filter((t) =>
-      (adjacencyMap[t.id] || []).some((neighborId) => {
-        const neighbor = workingTerritories.find((x) => x.id === neighborId)
-        return (
-          neighbor &&
-          neighbor.owner !== currentPlayer.id &&
-          neighbor.owner?.startsWith("cpu")
-        )
-      })
-    )
-
-    const preferredContinent = memory.continent
-    const inContinent = owned.filter((t) => t.continent === preferredContinent)
-    const connectorIds = entryPointsByContinent[preferredContinent] || []
-    const priority3 = inContinent.filter((t) => connectorIds.includes(t.id))
-
-    let targets = priority1.length
-      ? priority1
-      : priority2.length
-      ? priority2
-      : priority3.length
-      ? priority3
-      : owned
-
-    const index = memory.reinforceIndex % targets.length
-    const target = targets[index]
-    memory.reinforceIndex++
-
-    // Modify workingTerritories directly instead of using setTerritories
-    workingTerritories = workingTerritories.map((t) =>
-      t.id === target.id ? { ...t, troops: t.troops + 1 } : t
-    )
-
-    logAction?.(`➕ ${currentPlayer.name} reinforced ${target.name}`)
-
-    setReinforcements((prev) => ({
-      ...prev,
-      [currentPlayer.id]: prev[currentPlayer.id] - 1,
-    }))
-  }
+  setTimeout(() => startAttackLoop([...territories]), 0)
 
   function startAttackLoop(current) {
     const runNextRound = (territoriesSnapshot) => {
@@ -177,6 +172,14 @@ export function handleTurnPhaseLoop({
       }
 
       const attack = attacks[index++]
+      const attackerTile = currentTerritories.find((t) => t.id === attack.from)
+
+      if (!attackerTile || attackerTile.troops < 3) {
+        //logAction?.(`🚫 ${currentPlayer.name} skipped attack from ${attackerTile?.name} (not enough troops)`)
+        setTimeout(next, 0)
+        return
+      }
+
       const result = resolveBattle({
         attackerId: attack.from,
         defenderId: attack.to,
